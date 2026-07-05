@@ -17,10 +17,7 @@ function AskAI({ token, sopId, onAnswered }) {
     setIsLoading(true);
     setMessage('');
     try {
-      const res = await axios.post('/questions/',
-        { sop_id: sopId, question },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await axios.post('/questions/', { sop_id: sopId, question });
       setAnswer(res.data.answer);
       setSources(res.data.sources);
       setQuestion('');
@@ -28,7 +25,8 @@ function AskAI({ token, sopId, onAnswered }) {
       if (onAnswered) onAnswered();
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      const errorMsg = error.response?.data?.msg || 'Unable to answer that question';
+      console.error('AskAI request failed:', error.response || error.message);
+      const errorMsg = error.response?.data?.msg || error.message || 'Unable to answer that question';
       setMessage(`✗ ${errorMsg}`);
     } finally {
       setIsLoading(false);

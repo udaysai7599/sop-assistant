@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import SOP, Department
+from models import SOP, Department, User
 from db import db
 
 sops_bp = Blueprint('sops', __name__)
@@ -32,6 +32,15 @@ def get_or_create_department(department_id=None, department_name=None):
 @sops_bp.route('/', methods=['POST'])
 @jwt_required()
 def create_sop():
+    """
+    Create a new SOP. Only admins can create SOPs.
+    """
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    
+    if not user or not user.is_admin():
+        return jsonify({"msg": "Only admins can create SOPs"}), 403
+
     data = request.json or {}
     title = data.get('title', '').strip()
     content = data.get('content', '').strip()
@@ -46,19 +55,64 @@ def create_sop():
         title=title,
         content=content,
         department_id=department.id,
-        owner_id=int(get_jwt_identity())
+        owner_id=user_id
     )
     db.session.add(sop)
     db.session.commit()
-    return jsonify({"msg": "SOP created", "id": sop.id, "title": sop.title}), 201
+    return jsonify({
+        "msg": "SOP created", 
+        "id": sop.id, 
+        "title": sop.title
+    }), 201
 
 
 @sops_bp.route('/', methods=['GET'])
 @jwt_required()
-def list_sops():
+def list_all_sops():
+    """
+    List all available SOPs.
+    - Admins can see all SOPs they created
+    - Regular users can see all SOPs for asking questions
+    """
     user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    
+    # Get all SOPs
+    sops = SOP.query.all()
+    payload = []
+    
+    for sop in sops:
+        department = Department.query.get(sop.department_id)
+        owner = User.query.get(sop.owner_id)
+        
+        payload.append({
+            "id": sop.id,
+            "title": sop.title,
+            "content": sop.content,
+            "department_name": department.name if department else 'General',
+            "owner_email": owner.email if owner else 'Unknown',
+            "owner_id": sop.owner_id,
+            "is_owner": sop.owner_id == user_id
+        })
+    
+    return jsonify(payload), 200
+
+
+@sops_bp.route('/my-sops', methods=['GET'])
+@jwt_required()
+def list_my_sops():
+    """
+    List only SOPs created by the current user (admin only).
+    """
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    
+    if not user or not user.is_admin():
+        return jsonify({"msg": "Only admins can view their SOPs"}), 403
+    
     sops = SOP.query.filter_by(owner_id=user_id).all()
     payload = []
+    
     for sop in sops:
         department = Department.query.get(sop.department_id)
         payload.append({
@@ -67,4 +121,50 @@ def list_sops():
             "content": sop.content,
             "department_name": department.name if department else 'General'
         })
-    return jsonify(payload)
+    
+    return jsonify(payload), 200
+
+
+@sops_bp.route('/<int:sop_id>', methods=['GET'])
+@jwt_required()
+def get_sop(sop_id):
+    """
+    Get a specific SOP by ID.
+    Any authenticated user can view any SOP.
+    """
+    sop = SOP.query.get(sop_id)
+    if not sop:
+        return jsonify({"msg": "SOP not found"}), 404
+    
+    department = Department.query.get(sop.department_id)
+    owner = User.query.get(sop.owner_id)
+    
+    return jsonify({
+        "id": sop.id,
+        "title": sop.title,
+        "content": sop.content,
+        "department_name": department.name if department else 'General',
+        "owner_email": owner.email if owner else 'Unknown'
+    }), 200
+
+
+@sops_bp.route('/<int:sop_id>', methods=['DELETE'])
+@jwt_required()
+def delete_sop(sop_id):
+    """
+    Delete a SOP. Only the admin who created it can delete it.
+    """
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    
+    sop = SOP.query.get(sop_id)
+    if not sop:
+        return jsonify({"msg": "SOP not found"}), 404
+    
+    if not user or not user.is_admin() or sop.owner_id != user_id:
+        return jsonify({"msg": "Only the admin who created this SOP can delete it"}), 403
+    
+    db.session.delete(sop)
+    db.session.commit()
+    
+    return jsonify({"msg": "SOP deleted"}), 200

@@ -1,18 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import axios from './api';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import './styles.css';
 
 function App() {
-  const [token, setToken] = useState(() => localStorage.getItem('sop_token'));
+  const [token, setTokenState] = useState(() => localStorage.getItem('sop_token'));
 
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('sop_token', token);
+  const setToken = (newToken) => {
+    if (newToken) {
+      localStorage.setItem('sop_token', newToken);
+      axios.defaults.headers.common.Authorization = `Bearer ${newToken}`;
     } else {
       localStorage.removeItem('sop_token');
+      delete axios.defaults.headers.common.Authorization;
     }
-  }, [token]);
+    setTokenState(newToken);
+  };
+
+  if (token && !axios.defaults.headers.common.Authorization) {
+    axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+  }
 
   return (
     <div className="app-shell">

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from '../api';
 
-function SOPForm({ token, onCreated }) {
+function SOPForm({ onCreated }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [departmentName, setDepartmentName] = useState('IT');
@@ -16,10 +16,7 @@ function SOPForm({ token, onCreated }) {
 
     setIsLoading(true);
     try {
-      await axios.post('/sops/',
-        { title, content, department_name: departmentName },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.post('/sops/', { title, content, department_name: departmentName });
       setTitle('');
       setContent('');
       setDepartmentName('IT');

@@ -11,25 +11,28 @@ function Dashboard({ token, onLogout }) {
 
   // Fetch current user info to check role
   useEffect(() => {
-    axios.get('/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+    axios.get('/auth/me')
       .then(res => {
         setUser(res.data);
         setLoading(false);
       })
       .catch(err => {
         console.error('Failed to fetch user info:', err);
+        if (err.response?.status === 401) {
+          onLogout();
+        }
         setLoading(false);
       });
-  }, [token]);
+  }, [token, onLogout]);
 
   const refreshSOPs = () => {
-    axios.get('/sops/', { headers: { Authorization: `Bearer ${token}` } })
+    axios.get('/sops/')
       .then(res => setSops(res.data))
       .catch(() => setSops([]));
   };
 
   const refreshAnswers = () => {
-    axios.get('/answers/', { headers: { Authorization: `Bearer ${token}` } })
+    axios.get('/answers/')
       .then(res => setAnswers(res.data))
       .catch(() => setAnswers([]));
   };
@@ -77,7 +80,7 @@ function Dashboard({ token, onLogout }) {
 
       {/* Admin-only: SOP Creation Form */}
       {user.is_admin && (
-        <SOPForm token={token} onCreated={() => { refreshSOPs(); refreshAnswers(); }} />
+        <SOPForm onCreated={() => { refreshSOPs(); refreshAnswers(); }} />
       )}
 
       {/* Available SOPs Section */}
