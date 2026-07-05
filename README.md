@@ -1,31 +1,31 @@
 # SOP Assistant – Authenticated Full-Stack AI Application
 
 ## Overview
-An AI-powered SOP search and guidance tool with authentication, CRUD, and RAG workflow.
+A working MVP for an AI-powered SOP assistant with authentication, SOP creation, question answering, and saved Q&A history.
 
 ## Tech Stack
 - Frontend: React
 - Backend: Flask (Python)
-- Database: Postgres
-- Vector Store: Pinecone/FAISS
-- AI Model: GPT-4/Claude
+- Database: SQLite for local development
+- AI layer: rule-based retrieval over uploaded SOP content
 
-## Setup
+## Run locally
 ### Backend
-1. Create virtual environment
-2. Install dependencies: `pip install -r requirements.txt`
-3. Configure `.env`
-4. Run: `python app.py`
+1. `cd backend`
+2. `pip install -r requirements.txt`
+3. `python app.py`
 
 ### Frontend
-1. `npm install`
-2. `npm start`
+1. `cd frontend`
+2. `npm install`
+3. `npm start`
 
-## Features
-- User authentication (JWT)
-- SOP CRUD
-- AI/RAG Q&A with source-backed answers
-- Saved Q&A logs
+## What works now
+- Sign up and login with JWT authentication
+- Create SOPs with department labels
+- Ask questions against an SOP and receive a source-backed answer
+- Save and view answered questions in the dashboard
 
-## Deployment Notes
-Use environment variables for secrets. Do not commit `.env`.
+## Verification
+The backend regression test passes with:
+- `python -m pytest -q tests/test_end_to_end.py`
