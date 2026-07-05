@@ -29,7 +29,7 @@ class SOP(db.Model):
     content = db.Column(db.Text, nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'))
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    qna_logs = db.relationship('QnALog', backref='sop', lazy=True)
+    qna_logs = db.relationship('QnALog', backref='sop', lazy=True, cascade='all, delete-orphan')
 
 class QnALog(db.Model):
     id = db.Column(db.Integer, primary_key=True)

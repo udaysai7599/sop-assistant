@@ -40,9 +40,10 @@ def ask_question():
     db.session.commit()
 
     owner = User.query.get(sop.owner_id)
+
     return jsonify({
-        "answer": answer, 
-        "sources": sources, 
+        "answer": answer,
+        "sources": sources,
         "sop_title": sop.title,
         "sop_owner": owner.email if owner else 'Unknown'
     }), 200

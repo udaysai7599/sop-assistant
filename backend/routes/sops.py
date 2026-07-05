@@ -148,6 +148,49 @@ def get_sop(sop_id):
     }), 200
 
 
+@sops_bp.route('/<int:sop_id>', methods=['PUT'])
+@jwt_required()
+def update_sop(sop_id):
+    """
+    Update a SOP. Only the admin who created it can update it.
+    """
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    
+    sop = SOP.query.get(sop_id)
+    if not sop:
+        return jsonify({"msg": "SOP not found"}), 404
+    
+    if not user or not user.is_admin() or sop.owner_id != user_id:
+        return jsonify({"msg": "Only the admin who created this SOP can update it"}), 403
+    
+    data = request.json or {}
+    title = data.get('title', '').strip()
+    content = data.get('content', '').strip()
+    department_name = data.get('department_name', '').strip()
+    
+    if not title and not content and not department_name:
+        return jsonify({"msg": "At least one field (title, content, or department_name) is required"}), 400
+    
+    if title:
+        sop.title = title
+    if content:
+        sop.content = content
+    if department_name:
+        department = get_or_create_department(department_name=department_name)
+        sop.department_id = department.id
+    
+    db.session.commit()
+    
+    return jsonify({
+        "msg": "SOP updated",
+        "id": sop.id,
+        "title": sop.title,
+        "content": sop.content,
+        "department_name": Department.query.get(sop.department_id).name if sop.department_id else 'General'
+    }), 200
+
+
 @sops_bp.route('/<int:sop_id>', methods=['DELETE'])
 @jwt_required()
 def delete_sop(sop_id):

@@ -62,11 +62,6 @@ function AskAI({ token, sopId, onAnswered }) {
           <p>{answer}</p>
         </div>
       )}
-      {sources && (
-        <p className="sources">
-          <strong>Source excerpt:</strong> {sources}
-        </p>
-      )}
       {message && (
         <p className="message" style={{
           color: message.startsWith('✓') ? '#388e3c' : '#d32f2f'

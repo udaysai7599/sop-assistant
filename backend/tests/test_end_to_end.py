@@ -17,13 +17,14 @@ class EndToEndFlowTest(unittest.TestCase):
 
     def test_signup_login_create_sop_and_answer_question(self):
         signup_resp = self.client.post('/auth/signup', json={
-            'email': 'user@example.com',
-            'password': 'secret123'
+            'email': 'admin@example.com',
+            'password': 'secret123',
+            'admin_secret': 'admin-secret-key-change-me'
         })
         self.assertEqual(signup_resp.status_code, 201)
 
         login_resp = self.client.post('/auth/login', json={
-            'email': 'user@example.com',
+            'email': 'admin@example.com',
             'password': 'secret123'
         })
         self.assertEqual(login_resp.status_code, 200)
@@ -36,14 +37,15 @@ class EndToEndFlowTest(unittest.TestCase):
             'department_name': 'IT'
         }, headers={'Authorization': f'Bearer {token}'})
         self.assertEqual(create_resp.status_code, 201)
+        sop_id = create_resp.get_json()['id']
 
         list_resp = self.client.get('/sops/', headers={'Authorization': f'Bearer {token}'})
         self.assertEqual(list_resp.status_code, 200)
         self.assertEqual(len(list_resp.get_json()), 1)
 
         question_resp = self.client.post('/questions/', json={
-            'sop_id': create_resp.get_json()['id'],
-            'question': 'What should I do if the issue is critical?'
+            'sop_id': sop_id,
+            'question': 'How should I handle an incident?'
         }, headers={'Authorization': f'Bearer {token}'})
         self.assertEqual(question_resp.status_code, 200)
         self.assertIn('answer', question_resp.get_json())

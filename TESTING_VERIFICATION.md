@@ -370,3 +370,32 @@ sqlite3 backend/instance/sop_db.sqlite ".schema qna_log"
 1. Verify ADMIN_SECRET environment variable is set
 2. Check it matches what you're sending in signup
 3. Verify signup endpoint is checking admin_secret correctly
+
+
+Q: How long is the password reset link valid?
+A: Password reset links are valid for 24 hours from the time they are sent.
+
+Q: What should I do if I don't receive the reset email?
+A: Check your spam folder. If still not found, contact IT Support.
+
+Q: Can I use my previous password again?
+A: No, your new password must be different from the last 5 passwords used.
+
+Q: What time can I contact IT Support?
+A: IT Support is available Monday-Friday from 9 AM to 5 PM EST.
+
+cd c:\uday\sop-assistant
+sqlite3 instance\sop_db.sqlite
+
+
+-- See all users
+SELECT * FROM user;
+
+-- See specific user
+SELECT * FROM user WHERE email = 'testadmin@example.com';
+
+-- See all columns in user table
+.schema user
+
+cd c:\uday\sop-assistant
+python -c "import sqlite3; conn = sqlite3.connect('instance/sop_db.sqlite'); cursor = conn.cursor(); cursor.execute('SELECT email, role FROM user'); print('\n'.join([f'{row[0]} ({row[1]})' for row in cursor.fetchall()])); conn.close()"

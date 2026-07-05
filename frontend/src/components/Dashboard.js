@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import axios from '../api';
 import SOPForm from './SOPForm';
 import AskAI from './AskAI';
+import SOPEditor from './SOPEditor';
 
 function Dashboard({ token, onLogout }) {
   const [sops, setSops] = useState([]);
   const [answers, setAnswers] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSop, setSelectedSop] = useState(null);
 
   // Fetch current user info to check role
   useEffect(() => {
@@ -55,6 +57,12 @@ function Dashboard({ token, onLogout }) {
     }
   };
 
+  const handleClearHistory = () => {
+    if (window.confirm('Are you sure you want to clear all Q&A history?')) {
+      setAnswers([]);
+    }
+  };
+
   if (loading) {
     return <div className="dashboard"><p>Loading...</p></div>;
   }
@@ -90,26 +98,37 @@ function Dashboard({ token, onLogout }) {
           <p className="muted">{user.is_admin ? 'No SOPs created yet.' : 'No SOPs available yet.'}</p>
         ) : (
           sops.map(s => (
-            <div key={s.id} className="sop-card">
-              <div>
-                <h4>{s.title}</h4>
-                <p className="muted">Department: {s.department_name}</p>
-                {s.owner_email && <p className="muted">Owner: {s.owner_email}</p>}
+            <div key={s.id} className="sop-card" style={{ flexDirection: 'column', gap: '12px' }}>
+              <div className="sop-info">
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ margin: '0 0 8px 0' }}>{s.title}</h4>
+                  <p className="muted" style={{ margin: '4px 0' }}>Department: {s.department_name}</p>
+                  {s.owner_email && <p className="muted" style={{ margin: '4px 0' }}>Owner: {s.owner_email}</p>}
+                  {user.is_admin && s.is_owner && (
+                    <p className="muted" style={{ margin: '4px 0' }}><em>(You created this)</em></p>
+                  )}
+                </div>
                 {user.is_admin && s.is_owner && (
-                  <p className="muted"><em>(You created this)</em></p>
+                  <div className="sop-actions">
+                    <button 
+                      className="icon-btn"
+                      title="View/Edit SOP"
+                      onClick={() => setSelectedSop(s)}
+                    >
+                      ✎
+                    </button>
+                    <button 
+                      className="icon-btn danger"
+                      title="Delete SOP"
+                      onClick={() => handleDeleteSOP(s.id)}
+                    >
+                      🗑
+                    </button>
+                  </div>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <div className="sop-ask">
                 <AskAI token={token} sopId={s.id} onAnswered={refreshAnswers} />
-                {user.is_admin && s.is_owner && (
-                  <button 
-                    className="danger" 
-                    onClick={() => handleDeleteSOP(s.id)}
-                    style={{ padding: '10px 15px', marginTop: '10px' }}
-                  >
-                    Delete
-                  </button>
-                )}
               </div>
             </div>
           ))
@@ -118,7 +137,14 @@ function Dashboard({ token, onLogout }) {
 
       {/* Answers/Q&A History Section */}
       <div className="section-card">
-        <h3>Your Q&A History</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>Your Q&A History</h3>
+          {answers.length > 0 && (
+            <button className="danger" onClick={handleClearHistory} style={{ padding: '8px 15px' }}>
+              Clear History
+            </button>
+          )}
+        </div>
         {answers.length === 0 ? (
           <p className="muted">No saved answers yet. Ask a question above to begin.</p>
         ) : (
@@ -128,11 +154,19 @@ function Dashboard({ token, onLogout }) {
               <p className="muted">Asked at: {item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</p>
               <p><em>Q:</em> {item.question}</p>
               <p><em>A:</em> {item.answer}</p>
-              {item.sources && <p className="sources">Source: {item.sources}</p>}
             </div>
           ))
         )}
       </div>
+
+      {/* SOP Editor Modal */}
+      {selectedSop && (
+        <SOPEditor 
+          sop={selectedSop} 
+          onClose={() => setSelectedSop(null)}
+          onUpdated={refreshSOPs}
+        />
+      )}
     </div>
   );
 }
