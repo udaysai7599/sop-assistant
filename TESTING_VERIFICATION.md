@@ -16,59 +16,45 @@ sqlite3 backend/instance/sop_db.sqlite ".schema qna_log"
 ### 2. Backend API Testing
 
 #### Authentication
-- [x] Signup as admin with admin_secret
-  - ✓ Verified with `admin@test.com` using legacy `admin-secret-key-change-me`
-  - ✓ Role: admin confirmed
-  - ✓ Status: 201 Created
+- [ ] Signup as admin with admin_secret
   ```bash
   curl -X POST http://localhost:5000/auth/signup \
     -H "Content-Type: application/json" \
     -d '{"email":"admin@test.com","password":"test123","admin_secret":"admin-secret-key-change-me"}'
-  # Result: 201, role=admin
+  # Expected: 201, role=admin
   ```
 
-- [x] Signup as user without admin_secret
-  - ✓ Can be verified by omitting admin_secret
-  - ✓ Status: 201 Created, role=user
+- [ ] Signup as user without admin_secret
   ```bash
   curl -X POST http://localhost:5000/auth/signup \
     -H "Content-Type: application/json" \
     -d '{"email":"user@test.com","password":"test123"}'
-  # Result: 201, role=user
+  # Expected: 201, role=user
   ```
 
-- [x] Login as admin and verify role in response
-  - ✓ Verified in browser test: admin@test.com logged in successfully
-  - ✓ JWT token generated and stored
-  - ✓ Status: 200
+- [ ] Login as admin and verify role in response
   ```bash
   curl -X POST http://localhost:5000/auth/login \
     -H "Content-Type: application/json" \
     -d '{"email":"admin@test.com","password":"test123"}'
-  # Result: 200, includes role="admin"
+  # Expected: 200, includes role="admin"
   ```
 
-- [x] GET /auth/me returns user info with role
-  - ✓ Previously failed with 422 - FIXED
-  - ✓ Now returns 200 with user info and is_admin=true
-  - ✓ Dashboard successfully calls this endpoint
+- [ ] GET /auth/me returns user info with role
   ```bash
   curl -X GET http://localhost:5000/auth/me \
     -H "Authorization: Bearer {admin_token}"
-  # Result: 200, includes is_admin=true
+  # Expected: 200, includes is_admin=true
   ```
 
 #### SOP Management (Admin)
-- [x] Create SOP as admin (should succeed)
-  - ✓ Verified in browser: Created "Incident Response Procedure"
-  - ✓ Department: "IT"
-  - ✓ Status: 201 Created
+- [ ] Create SOP as admin (should succeed)
   ```bash
   curl -X POST http://localhost:5000/sops/ \
     -H "Authorization: Bearer {admin_token}" \
     -H "Content-Type: application/json" \
     -d '{"title":"Test SOP","content":"Test content","department_name":"IT"}'
-  # Result: 201, returns SOP id
+  # Expected: 201, returns SOP id
   ```
 
 - [ ] Create SOP as user (should fail)
@@ -193,127 +179,89 @@ sqlite3 backend/instance/sop_db.sqlite ".schema qna_log"
 ### 3. Frontend Verification
 
 #### Dashboard Component
-- [x] Admin sees "Create SOP" form
-  - ✓ Verified in browser
-  - ✓ Login as admin showed SOPForm component
-  - ✓ Title: "📝 Create New SOP (Admin Only)"
+- [ ] Admin sees "Create SOP" form
+  - [ ] Login as admin
+  - [ ] Verify SOPForm is visible
+  - [ ] Title says "Create New SOP (Admin Only)"
 
-- [x] User does NOT see "Create SOP" form
-  - ⚠️  Not tested yet (would need separate user account)
-  - Expected: SOPForm should be hidden for users
+- [ ] User does NOT see "Create SOP" form
+  - [ ] Login as user
+  - [ ] Verify SOPForm is NOT visible
 
-- [x] Both see all SOPs
-  - ✓ Admin dashboard shows "All SOPs" section
-  - ✓ Lists are visible and populated with created SOP
-  - ✓ Shows owner information
+- [ ] Both see all SOPs
+  - [ ] SOPs list shows owner information
+  - [ ] Both admin and user see same SOP list
 
 - [ ] Only admin sees delete button
-  - ✓ Delete button (🗑) visible for admin's own SOPs
-  - ⚠️  User perspective not tested yet
+  - [ ] Admin sees delete button on own SOPs
+  - [ ] User does NOT see delete button
+  - [ ] Admin does NOT see delete on other admin's SOPs
 
-- [x] Q&A history shows timestamps
-  - ✓ Verified: "Asked at: 7/15/2026, 7:22:48 PM"
-  - ✓ Each answer shows created_at date/time
+- [ ] Q&A history shows timestamps
+  - [ ] Each answer shows created_at date/time
 
 #### Login Component
-- [x] Signup form shows admin_secret field
-  - ✓ Verified in browser
-  - ✓ Click "Switch to sign up" shows admin secret input
-  - ✓ Field: "Admin Secret (optional, leave blank for regular user)"
+- [ ] Signup form shows admin_secret field
+  - [ ] Click "Switch to sign up"
+  - [ ] Verify admin_secret input appears
 
-- [x] Role is displayed after login
-  - ✓ Dashboard shows: "Logged in as: admin@test.com (admin)"
-  - ✓ Role clearly indicated in UI
+- [ ] Role is displayed after login
+  - [ ] Login response shows role
+  - [ ] Message indicates "signed in as Admin" or "signed in as User"
 
 #### SOPForm Component
-- [x] Loading state works
-  - ✓ Form responded to Save SOP button click
-  - ✓ Form disabled during submission
+- [ ] Loading state works
+  - [ ] Button shows "Creating..." while submitting
+  - [ ] Form is disabled during submission
 
-- [x] Success message shows
-  - ✓ Verified: "✓ SOP created successfully" displayed
+- [ ] Success message shows
+  - [ ] After creation, shows "✓ SOP created successfully"
 
 - [ ] Error message shows for non-admin
-  - ⚠️  Not tested yet (would need user login)
+  - [ ] Non-admin sees "✗ Only admins can create SOPs"
 
 #### AskAI Component
-- [x] Loading state works
-  - ✓ Button click processed
-  - ✓ Response generated
+- [ ] Loading state works
+  - [ ] Button shows "Thinking..." while processing
 
 - [ ] Enter key submits question
-  - ⚠️  Not tested (clicked button instead)
+  - [ ] Press Enter in question input → submits
 
-- [x] Success message shows
-  - ✓ Verified: "✓ Answer saved to your history" displayed
-
-#### DocumentUpload Component
-- [x] Document upload form visible
-  - ✓ Verified: "📄 Upload a document" section displayed
-
-- [x] File selection works
-  - ✓ Verified: test_doc.txt selected
-
-- [x] Upload confirmation
-  - ✓ Verified: "✓ Document uploaded and indexed" message
+- [ ] Success message shows
+  - [ ] After answer, shows "✓ Answer saved to your history"
 
 ### 4. Integration Testing
 
 #### Complete Admin Flow
-1. [x] Create new admin account with admin_secret
-   - ✓ admin@test.com created with legacy admin-secret
-2. [x] Login as admin
-   - ✓ Successfully logged in via UI
-3. [x] Create multiple SOPs in different departments
-   - ✓ Created "Incident Response Procedure" (IT department)
-4. [x] List SOPs and verify they appear
-   - ✓ SOP appears in "All SOPs" section
-5. [x] Ask a question on one SOP
-   - ✓ "What should I do immediately when an incident is detected?" submitted
-6. [x] View answer in history
-   - ✓ Answer shows in Q&A History with timestamp: 7/15/2026, 7:22:48 PM
+1. [ ] Create new admin account with admin_secret
+2. [ ] Login as admin
+3. [ ] Create multiple SOPs in different departments
+4. [ ] List SOPs and verify they appear
+5. [ ] Ask a question on one SOP
+6. [ ] View answer in history
 7. [ ] Delete the SOP
-   - ⚠️  Functionality available but not tested
 8. [ ] Verify SOP no longer appears
-   - ⚠️  Pending
 
 #### Complete User Flow
 1. [ ] Create new user account without admin_secret
-   - ⚠️  Not tested yet
 2. [ ] Login as user
-   - ⚠️  Not tested yet
 3. [ ] Try to create SOP (should fail) - verify error message
-   - ⚠️  Not tested yet
 4. [ ] View list of SOPs created by admin
-   - ⚠️  Not tested yet (need user account)
 5. [ ] Ask questions on multiple SOPs
-   - ⚠️  Not tested yet
 6. [ ] View Q&A history
-   - ⚠️  Not tested yet
 7. [ ] Verify user cannot delete any SOP
-   - ⚠️  Not tested yet
 8. [ ] Verify user cannot view other users' Q&A
-   - ⚠️  Not tested yet
 
 #### Cross-User Scenario
 1. [ ] Create Admin1 and Admin2
-   - ⚠️  Not tested yet
 2. [ ] Admin1 creates SOP1
-   - ⚠️  Not tested yet
 3. [ ] Admin2 creates SOP2
-   - ⚠️  Not tested yet
 4. [ ] Create User1
-   - ⚠️  Not tested yet
 5. [ ] User1 asks questions on both SOP1 and SOP2
-   - ⚠️  Not tested yet
 6. [ ] Admin1 can delete SOP1 but not SOP2
-   - ⚠️  Not tested yet
 7. [ ] Admin2 can delete SOP2 but not SOP1
-   - ⚠️  Not tested yet
 8. [ ] Admin1 can see SOP2 in list but cannot delete
-   - ⚠️  Not tested yet
 9. [ ] User1 sees both SOPs and can ask questions on both
-   - ⚠️  Not tested yet
 
 ### 5. Error Scenarios
 
@@ -386,58 +334,17 @@ sqlite3 backend/instance/sop_db.sqlite ".schema qna_log"
 
 ## Sign-Off Checklist
 
-- [x] All API endpoints tested and working
-  - ✓ Auth endpoints: signup, login, /auth/me
-  - ✓ SOP endpoints: create, list, display
-  - ✓ Question endpoints: ask, get history
-  - ✓ Document endpoints: upload
-  
-- [x] Frontend displays correctly for both roles
-  - ✓ Admin sees admin-only components
-  - ✓ All components render without errors
-  - ⚠️  User role not tested yet
-  
-- [x] Admin can create SOPs
-  - ✓ Successfully created "Incident Response Procedure"
-  
+- [ ] All API endpoints tested and working
+- [ ] Frontend displays correctly for both roles
+- [ ] Admin can create SOPs
 - [ ] User cannot create SOPs
-  - ⚠️  Not tested (need user account)
-  
-- [x] All users can ask questions
-  - ✓ Admin asked question about SOP
-  - ✓ Answer generated using RAG
-  
-- [x] All users can view their own Q&A history
-  - ✓ Q&A history displayed with timestamps
-  - ✓ Shows question, answer, and creation time
-  
-- [x] No security vulnerabilities identified
-  - ✓ JWT tokens validated
-  - ✓ Passwords not exposed in API responses
-  - ✓ Admin secret not logged
-  
-- [x] Documentation is clear and complete
-  - ✓ README.md covers all sections
-  - ✓ .env.example files provided
-  - ✓ API routes documented
-  
-- [x] Performance is acceptable
-  - ✓ Page loads quickly
-  - ✓ API responses fast
-  - ✓ No noticeable lag
-  
-- [x] Error handling is appropriate
-  - ✓ 401/403/404 errors handled
-  - ✓ User-friendly error messages displayed
-  - ✓ Errors logged to console for debugging
-  
-- [x] Ready for production deployment
-  - ✓ Core features working
-  - ✓ Auth system secure
-  - ✓ Data persists correctly
-  - ✓ Admin workflow complete
-  - ⚠️  User workflow not fully tested
-  - ⚠️  Cross-user scenarios not tested
+- [ ] All users can ask questions
+- [ ] All users can view their own Q&A history
+- [ ] No security vulnerabilities identified
+- [ ] Documentation is clear and complete
+- [ ] Performance is acceptable
+- [ ] Error handling is appropriate
+- [ ] Ready for production deployment
 
 ---
 

@@ -4,18 +4,29 @@ from pathlib import Path
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from config import get_app_host, get_app_port, get_database_uri, get_flask_debug_mode, get_jwt_secret_key
 from db import db
 from routes.auth import auth_bp
 from routes.sops import sops_bp
 from routes.questions import questions_bp
 from routes.answers import answers_bp
-from routes.documents import documents_bp
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
+# Use DATABASE_URL if provided, otherwise fall back to sqlite for local dev
+base_dir = Path(__file__).resolve().parent
+workspace_root = base_dir.parent
+legacy_root_instance = workspace_root / 'instance' / 'sop_db.sqlite'
+legacy_backend_instance = base_dir / 'instance' / 'sop_db.sqlite'
+
+if os.getenv('DATABASE_URL'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+elif legacy_root_instance.exists():
+    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{legacy_root_instance.as_posix()}"
+else:
+    legacy_backend_instance.parent.mkdir(parents=True, exist_ok=True)
+    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{legacy_backend_instance.as_posix()}"
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = get_jwt_secret_key()
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'sop-assistant-super-secret-key-2026')
 
 CORS(app, resources={r'/*': {'origins': '*'}})
 db.init_app(app)
@@ -26,7 +37,6 @@ app.register_blueprint(auth_bp, url_prefix='/auth')
 app.register_blueprint(sops_bp, url_prefix='/sops')
 app.register_blueprint(questions_bp, url_prefix='/questions')
 app.register_blueprint(answers_bp, url_prefix='/answers')
-app.register_blueprint(documents_bp, url_prefix='/documents')
 
 
 def ensure_sqlite_column(table_name, column_name, column_type='VARCHAR(20)', default_value="'user'"):
@@ -50,13 +60,6 @@ def ensure_sqlite_column(table_name, column_name, column_type='VARCHAR(20)', def
 
 if __name__ == '__main__':
     with app.app_context():
-        # Ensure database directory exists
-        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-        if db_uri.startswith('sqlite:///'):
-            db_path = db_uri.replace('sqlite:///', '')
-            db_path = os.path.abspath(db_path)
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        
         db.create_all()
         ensure_sqlite_column('user', 'role', "VARCHAR(20)", "'user'")
-    app.run(host=get_app_host(), port=get_app_port(), debug=get_flask_debug_mode())
+    app.run(host='0.0.0.0', port=5000, debug=True)

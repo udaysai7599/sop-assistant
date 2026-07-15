@@ -1,18 +1,13 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from config import get_admin_secret
 from models import User
 from db import db
+import os
 
 auth_bp = Blueprint('auth', __name__)
 
-ADMIN_SECRET = get_admin_secret()
-LEGACY_ADMIN_SECRET = 'admin-secret-key-change-me'
-
-
-def _is_admin_secret_valid(provided_secret):
-    """Allow both the configured admin secret and the legacy default used by earlier setup steps."""
-    return provided_secret in {ADMIN_SECRET, LEGACY_ADMIN_SECRET}
+# Admin password for creating first admin (should be set as environment variable)
+ADMIN_SECRET = os.getenv('ADMIN_SECRET', 'admin-secret-key-change-me')
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
@@ -32,7 +27,7 @@ def signup():
     
     # Determine if user should be admin
     role = 'user'
-    if _is_admin_secret_valid(data.get('admin_secret')):
+    if data.get('admin_secret') == ADMIN_SECRET:
         role = 'admin'
     
     user = User(email=data['email'], role=role)

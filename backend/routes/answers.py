@@ -39,7 +39,7 @@ def get_answer(answer_id):
     Only the user who asked the question can view it.
     """
     user_id = int(get_jwt_identity())
-    log = db.session.get(QnALog, answer_id)
+    log = QnALog.query.get(answer_id)
     
     if not log:
         return jsonify({"msg": "Answer not found"}), 404

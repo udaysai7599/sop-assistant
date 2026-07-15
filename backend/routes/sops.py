@@ -82,8 +82,8 @@ def list_all_sops():
     payload = []
     
     for sop in sops:
-        department = db.session.get(Department, sop.department_id)
-        owner = db.session.get(User, sop.owner_id)
+        department = Department.query.get(sop.department_id)
+        owner = User.query.get(sop.owner_id)
         
         payload.append({
             "id": sop.id,

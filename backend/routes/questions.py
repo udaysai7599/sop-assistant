@@ -1,9 +1,8 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import SOP, QnALog, User, Document, DocumentChunk
+from models import SOP, QnALog, User
 from db import db
 from rag import run_rag
-from services.document_service import build_document_chunks
 
 questions_bp = Blueprint('questions', __name__)
 
@@ -17,34 +16,17 @@ def ask_question():
     """
     data = request.json or {}
     sop_id = data.get('sop_id')
-    document_id = data.get('document_id')
     question = (data.get('question') or '').strip()
 
-    if not question:
-        return jsonify({"msg": "A question is required"}), 400
+    if not sop_id or not question:
+        return jsonify({"msg": "SOP ID and question are required"}), 400
 
-    sop = None
-    document = None
-    context_source = None
+    sop = SOP.query.get(int(sop_id))
+    if not sop:
+        return jsonify({"msg": "SOP not found"}), 404
 
-    if sop_id:
-        sop = SOP.query.get(int(sop_id))
-        if not sop:
-            return jsonify({"msg": "SOP not found"}), 404
-        answer, sources = run_rag(question, sop.content)
-        context_source = sop.title
-    elif document_id:
-        document = db.session.get(Document, int(document_id))
-        if not document:
-            return jsonify({"msg": "Document not found"}), 404
-        chunks = [chunk.content for chunk in document.chunks]
-        if not chunks:
-            chunks = build_document_chunks(document.content)
-        best_chunk = max(chunks, key=lambda chunk: len(set(question.lower().split()) & set(chunk.lower().split())), default="")
-        answer, sources = run_rag(question, best_chunk or document.content)
-        context_source = document.title
-    else:
-        return jsonify({"msg": "SOP ID or document ID is required"}), 400
+    # Generate answer using RAG on SOP content
+    answer, sources = run_rag(question, sop.content)
 
     user_id = int(get_jwt_identity())
     log = QnALog(
@@ -52,17 +34,17 @@ def ask_question():
         answer=answer,
         sources=sources,
         user_id=user_id,
-        sop_id=sop.id if sop else None,
-        document_id=document.id if document else None
+        sop_id=sop.id
     )
     db.session.add(log)
     db.session.commit()
 
-    owner = User.query.get(sop.owner_id) if sop else None
+    owner = User.query.get(sop.owner_id)
+
     return jsonify({
         "answer": answer,
         "sources": sources,
-        "sop_title": context_source,
+        "sop_title": sop.title,
         "sop_owner": owner.email if owner else 'Unknown'
     }), 200
 

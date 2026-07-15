@@ -1,7 +1,6 @@
 from db import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
-
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -32,22 +31,6 @@ class SOP(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     qna_logs = db.relationship('QnALog', backref='sop', lazy=True, cascade='all, delete-orphan')
 
-class Document(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=db.func.now())
-    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    chunks = db.relationship('DocumentChunk', backref='document', lazy=True, cascade='all, delete-orphan')
-
-
-class DocumentChunk(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    document_id = db.Column(db.Integer, db.ForeignKey('document.id'), nullable=False)
-    chunk_index = db.Column(db.Integer, nullable=False)
-    content = db.Column(db.Text, nullable=False)
-
-
 class QnALog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.Text, nullable=False)
@@ -55,5 +38,4 @@ class QnALog(db.Model):
     sources = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=db.func.now())
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    sop_id = db.Column(db.Integer, db.ForeignKey('sop.id'))
-    document_id = db.Column(db.Integer, db.ForeignKey('document.id'))
+    sop_id = db.Column(db.Integer, db.ForeignKey('sop.id'), nullable=False)
