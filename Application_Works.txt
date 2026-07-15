@@ -1,0 +1,1215 @@
+================================================================================
+                        SOP ASSISTANT - APPLICATION OVERVIEW
+                      HOW THE APPLICATION WORKS (Step by Step)
+================================================================================
+
+PROJECT NAME: SOP Assistant
+PURPOSE: A lightweight internal knowledge assistant for teams that need fast 
+         access to standard operating procedures (SOPs)
+
+================================================================================
+1. PROJECT OVERVIEW & USE CASE
+================================================================================
+
+PROBLEM SOLVED:
+- Organizations keep SOPs scattered across multiple documents or static wikis
+- Employees struggle to find guidance quickly during time-sensitive work
+- Need for a centralized, searchable SOP management system
+
+TARGET USERS:
+- Operations teams
+- Support staff
+- HR teams
+- Other internal users who need reliable answers without manual document searching
+
+KEY FEATURES:
+- Admin-managed SOP creation, editing, and deletion
+- Authenticated question answering over stored SOP content
+- RAG-style (Retrieval-Augmented Generation) retrieval using sentence scoring
+- User-specific Q&A history tracking
+- Role-based access control (Admin vs. Regular User)
+- Simple React frontend with Flask backend
+
+================================================================================
+2. TECHNOLOGY STACK
+================================================================================
+
+BACKEND TECHNOLOGIES:
+├─ Framework: Flask (Python web framework)
+├─ Database ORM: Flask-SQLAlchemy (Object-Relational Mapping)
+├─ Authentication: Flask-JWT-Extended (JSON Web Tokens for auth)
+├─ CORS: Flask-CORS (Cross-Origin Resource Sharing)
+├─ Password Hashing: Werkzeug (secure password handling)
+├─ Database Options: 
+│  ├─ SQLite (default for local development)
+│  └─ PostgreSQL (via DATABASE_URL environment variable)
+└─ Testing: Python unittest framework
+
+FRONTEND TECHNOLOGIES:
+├─ Framework: React 18.2.0 (JavaScript UI library)
+├─ HTTP Client: Axios (for API calls)
+├─ Styling: CSS (custom stylesheets)
+└─ Build Tool: React Scripts (CRA - Create React App)
+
+RUNTIME ENVIRONMENT:
+├─ Backend: Python 3.x with Flask running on localhost:5000
+├─ Frontend: Node.js with React running on localhost:3000
+└─ Communication: REST API + JSON payloads
+
+================================================================================
+3. DATA MODELS & DATABASE STRUCTURE
+================================================================================
+
+DATABASE MODELS (SQLAlchemy ORM):
+
+USER MODEL:
+├─ id: Integer (Primary Key)
+├─ email: String (Unique, Required)
+├─ password_hash: String (Hashed password)
+├─ role: String (Default: 'user', can be 'admin' or 'user')
+├─ sops: Relationship to SOP model (SOPs created by this user)
+└─ qna_logs: Relationship to QnALog (Q&A history for this user)
+
+DEPARTMENT MODEL:
+├─ id: Integer (Primary Key)
+├─ name: String (Department name, e.g., "IT", "HR", "Finance")
+└─ sops: Relationship to SOP (SOPs within this department)
+
+SOP MODEL (Standard Operating Procedure):
+├─ id: Integer (Primary Key)
+├─ title: String (SOP title, Required)
+├─ content: Text (Full SOP content/body, Required)
+├─ department_id: Integer (Foreign Key to Department)
+├─ owner_id: Integer (Foreign Key to User - who created this SOP)
+└─ qna_logs: Relationship to QnALog (Q&A history for this SOP)
+
+QNA_LOG MODEL (Question & Answer Log):
+├─ id: Integer (Primary Key)
+├─ question: Text (User's question, Required)
+├─ answer: Text (Generated answer from RAG engine)
+├─ sources: Text (Source excerpt from SOP that was used)
+├─ created_at: DateTime (Timestamp of when Q&A was created)
+├─ user_id: Integer (Foreign Key to User - who asked)
+└─ sop_id: Integer (Foreign Key to SOP - which SOP was questioned)
+
+RELATIONSHIPS:
+- User → has many SOPs (owner relationship)
+- User → has many QnALogs (creator relationship)
+- Department → has many SOPs
+- SOP → has many QnALogs (deleted when SOP is deleted)
+
+================================================================================
+4. AUTHENTICATION & AUTHORIZATION FLOW
+================================================================================
+
+STEP 1: USER REGISTRATION (Sign Up)
+┌─────────────────────────────────────────────────────────────────┐
+│ Frontend Login Component displays sign-up form                   │
+│ User enters: email, password, optional admin_secret             │
+│                                                                  │
+│ POST /auth/signup (Backend)                                     │
+│ ├─ Check if email already exists                               │
+│ ├─ If admin_secret matches ADMIN_SECRET env var → role='admin' │
+│ ├─ Otherwise → role='user'                                      │
+│ ├─ Hash password using Werkzeug security                       │
+│ ├─ Create new User in database                                 │
+│ └─ Return created user info                                    │
+└─────────────────────────────────────────────────────────────────┘
+
+STEP 2: USER LOGIN
+┌─────────────────────────────────────────────────────────────────┐
+│ User enters email and password in Login component              │
+│                                                                  │
+│ POST /auth/login (Backend)                                      │
+│ ├─ Query User by email                                         │
+│ ├─ Verify password using Werkzeug check_password_hash         │
+│ ├─ If valid: Create JWT token with user_id as identity        │
+│ └─ Return: access_token, user_id, email, role                │
+│                                                                  │
+│ Frontend receives token:                                        │
+│ ├─ Store token in localStorage (key: 'sop_token')            │
+│ ├─ Set Axios default Authorization header: "Bearer {token}"   │
+│ └─ Redirect to Dashboard                                       │
+└─────────────────────────────────────────────────────────────────┘
+
+STEP 3: TOKEN VERIFICATION FOR PROTECTED ROUTES
+┌─────────────────────────────────────────────────────────────────┐
+│ All protected routes use @jwt_required() Flask decorator        │
+│                                                                  │
+│ Request comes with Authorization: Bearer {token}               │
+│ ├─ Flask-JWT-Extended validates token signature                │
+│ ├─ Extracts user_id from token                                 │
+│ ├─ If invalid/expired → Return 401 Unauthorized               │
+│ └─ If valid → Proceed with request                             │
+└─────────────────────────────────────────────────────────────────┘
+
+STEP 4: ROLE-BASED ACCESS CONTROL
+┌─────────────────────────────────────────────────────────────────┐
+│ user.is_admin() → Returns True if role == 'admin'             │
+│                                                                  │
+│ SOP CREATION (Admin Only):                                      │
+│ POST /sops/ → Check if user.is_admin() == True                │
+│ ├─ If False → Return 403 Forbidden                            │
+│ └─ If True → Create SOP with owner_id set to current user     │
+│                                                                  │
+│ QUESTION ASKING (Any Authenticated User):                      │
+│ POST /questions/ → No role check needed, authenticated users   │
+│ ├─ Can ask questions about any SOP                             │
+│ └─ Answer stored with their user_id                            │
+└─────────────────────────────────────────────────────────────────┘
+
+LOGOUT:
+- Frontend clears localStorage token
+- Removes Axios Authorization header
+- Redirects user back to Login page
+- Session is stateless (no server-side logout needed)
+
+================================================================================
+5. SOP MANAGEMENT WORKFLOW
+================================================================================
+
+ADMIN CREATES SOP:
+┌──────────────────────────────────────────────────────────┐
+│ 1. Admin navigates to Dashboard                          │
+│ 2. Admin role confirmed via GET /auth/me                │
+│ 3. Admin opens SOPForm component                         │
+│ 4. Admin enters: title, content, optional department    │
+│ 5. Frontend submits: POST /sops/                        │
+│                                                          │
+│ Backend Processing:                                      │
+│ ├─ Verify user is admin                                 │
+│ ├─ Validate title and content not empty                 │
+│ ├─ Get or create Department (if specified)             │
+│ ├─ Create new SOP with:                                 │
+│ │  ├─ title, content                                   │
+│ │  ├─ department_id (auto-set to "General" if missing) │
+│ │  └─ owner_id (set to current admin's user_id)       │
+│ ├─ Commit to database                                   │
+│ └─ Return: SOP id, title, confirmation message         │
+│                                                          │
+│ 6. Frontend receives success response                    │
+│ 7. Dashboard refreshes SOP list                         │
+│ 8. New SOP now appears for all users                    │
+└──────────────────────────────────────────────────────────┘
+
+ADMIN EDITS SOP:
+┌──────────────────────────────────────────────────────────┐
+│ 1. Admin opens SOPEditor component for an existing SOP   │
+│ 2. Admin modifies title/content                          │
+│ 3. Frontend submits: PUT /sops/{id}                     │
+│                                                          │
+│ Backend Processing:                                      │
+│ ├─ Verify user is admin                                 │
+│ ├─ Fetch SOP by id                                      │
+│ ├─ Update title and/or content                          │
+│ ├─ Commit changes to database                           │
+│ └─ Return updated SOP info                              │
+│                                                          │
+│ 4. Frontend updates display                              │
+└──────────────────────────────────────────────────────────┘
+
+ADMIN DELETES SOP:
+┌──────────────────────────────────────────────────────────┐
+│ 1. Admin clicks delete button on SOP                     │
+│ 2. Frontend shows confirmation dialog                    │
+│ 3. On confirm: DELETE /sops/{id}                       │
+│                                                          │
+│ Backend Processing:                                      │
+│ ├─ Verify user is admin                                 │
+│ ├─ Fetch SOP by id                                      │
+│ ├─ Delete SOP (cascade deletes all QnALogs)           │
+│ ├─ Commit deletion to database                          │
+│ └─ Return success message                               │
+│                                                          │
+│ 4. Frontend removes SOP from list                        │
+└──────────────────────────────────────────────────────────┘
+
+USER VIEWS AVAILABLE SOPS:
+┌──────────────────────────────────────────────────────────┐
+│ 1. Frontend: GET /sops/                                  │
+│ 2. Backend returns: List of ALL SOPs with titles        │
+│ 3. Frontend displays in Dashboard dropdown/list          │
+│ 4. User selects an SOP to ask a question                │
+└──────────────────────────────────────────────────────────┘
+
+================================================================================
+6. QUESTION ANSWERING WORKFLOW (RAG ENGINE)
+================================================================================
+
+USER ASKS QUESTION:
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. User selects an SOP from dropdown (AskAI component)         │
+│ 2. User types a question in the text input                      │
+│ 3. User clicks "Ask" button                                     │
+│ 4. Frontend submits: POST /questions/                          │
+│    Payload: { sop_id: <id>, question: "user's question" }     │
+└─────────────────────────────────────────────────────────────────┘
+
+RAG ENGINE PROCESSING (Backend - rag.py):
+┌─────────────────────────────────────────────────────────────────┐
+│ Function: run_rag(question, sop_content)                        │
+│                                                                  │
+│ STEP 1: TOKENIZATION                                           │
+│ ├─ Convert question to lowercase                               │
+│ ├─ Extract tokens (words/numbers) using regex [a-z0-9']+      │
+│ └─ Store as: question_tokens = ['word1', 'word2', ...]        │
+│                                                                  │
+│ STEP 2: SENTENCE SPLITTING                                     │
+│ ├─ Split SOP content by sentence terminators: . ! ?           │
+│ ├─ Create list of sentences from entire SOP content            │
+│ └─ Example: ["Sentence 1.", "Sentence 2.", ...]              │
+│                                                                  │
+│ STEP 3: SCORING EACH SENTENCE                                  │
+│ │                                                               │
+│ ├─ For each sentence in SOP:                                   │
+│ │  ├─ Tokenize the sentence                                    │
+│ │  ├─ Calculate relevance score using multiple metrics:        │
+│ │  │                                                            │
+│ │  │  A) EXACT PHRASE MATCH (3.0 points if found)            │
+│ │  │     If user's full question appears in sentence           │
+│ │  │                                                            │
+│ │  │  B) TOKEN OVERLAP (variable points)                       │
+│ │  │     Count common words between question and sentence      │
+│ │  │     Example: Q="incident handling"                        │
+│ │  │              S="How to handle an incident quickly"        │
+│ │  │              Overlap: "incident"=1, "handle"=1 (total 2)  │
+│ │  │     Score += 2 (number of matching tokens)                │
+│ │  │                                                            │
+│ │  │  C) NORMALIZATION BY LENGTH (variable points)            │
+│ │  │     Score += overlap / len(question_tokens)               │
+│ │  │     Score += overlap / len(sentence_tokens)               │
+│ │  │     (Prevents bias towards very long sentences)           │
+│ │  │                                                            │
+│ │  │  D) SIMILARITY RATIO (0.0-1.0 bonus)                     │
+│ │  │     Uses SequenceMatcher for semantic closeness          │
+│ │  │     Measures how similar strings are at character level  │
+│ │  │                                                            │
+│ │  └─ Total Score = Sum of all above metrics                   │
+│ │                                                               │
+│ └─ Track highest-scoring sentence                              │
+│                                                                  │
+│ STEP 4: GENERATE ANSWER                                        │
+│ ├─ If best_score <= 0 (no good match found):                  │
+│ │  └─ Return fallback answer with first 500 chars of SOP      │
+│ │     Format: "I could not find a specific SOP answer for     │
+│ │             that question. Here is the relevant guidance:   │
+│ │             [SOP excerpt]"                                  │
+│ │                                                              │
+│ └─ If best_score > 0 (good match found):                      │
+│    └─ Return: "According to the SOP, [best sentence]"         │
+│                                                                 │
+│ STEP 5: EXTRACT SOURCE                                        │
+│ └─ Take first 500 characters of best sentence as source       │
+└─────────────────────────────────────────────────────────────────┘
+
+BACKEND STORES Q&A:
+┌─────────────────────────────────────────────────────────────────┐
+│ In questions.py route:                                          │
+│ 1. Generate answer using run_rag()                             │
+│ 2. Create QnALog record:                                        │
+│    ├─ question: user's question text                           │
+│    ├─ answer: generated answer from RAG                        │
+│    ├─ sources: extracted source sentence                       │
+│    ├─ user_id: current user's ID                               │
+│    ├─ sop_id: the SOP that was questioned                      │
+│    └─ created_at: current timestamp (auto-set)                │
+│ 3. Commit to database                                           │
+│ 4. Return to frontend:                                          │
+│    ├─ answer, sources                                          │
+│    ├─ sop_title, sop_owner info                               │
+│    └─ HTTP 200 OK                                              │
+└─────────────────────────────────────────────────────────────────┘
+
+FRONTEND DISPLAYS ANSWER:
+┌─────────────────────────────────────────────────────────────────┐
+│ 1. AskAI component receives response                            │
+│ 2. Displays:                                                    │
+│    ├─ The generated answer                                      │
+│    ├─ Source text (what part of SOP was used)                 │
+│    ├─ SOP title and owner                                     │
+│    └─ Timestamp                                                │
+│ 3. User can view their Q&A history                            │
+└─────────────────────────────────────────────────────────────────┘
+
+================================================================================
+7. Q&A HISTORY & RETRIEVAL
+================================================================================
+
+USER VIEWS QUESTION HISTORY:
+┌─────────────────────────────────────────────────────────────────┐
+│ Frontend: GET /questions/history                               │
+│ Backend:                                                         │
+│ ├─ Get current user_id from JWT token                         │
+│ ├─ Query all QnALog records where user_id = current user      │
+│ ├─ Sort by id DESC (newest first)                             │
+│ ├─ For each log, fetch related SOP info                       │
+│ └─ Return list with: question, answer, sources, sop_title,    │
+│                      created_at                                │
+│                                                                  │
+│ Frontend displays in chronological order (newest first)        │
+└─────────────────────────────────────────────────────────────────┘
+
+USER RETRIEVES SPECIFIC Q&A:
+┌─────────────────────────────────────────────────────────────────┐
+│ Frontend: GET /questions/{question_id}                         │
+│ Backend:                                                         │
+│ ├─ Verify current user owns this Q&A log                       │
+│ ├─ Return detailed Q&A record                                  │
+│ └─ HTTP 200 or 403 (Forbidden if not owner)                   │
+└─────────────────────────────────────────────────────────────────┘
+
+================================================================================
+8. FRONTEND ARCHITECTURE & COMPONENTS
+================================================================================
+
+APP.JS (Main Application Root):
+┌────────────────────────────────────────────────────┐
+│ 1. Initializes React app                          │
+│ 2. Manages auth token state:                       │
+│    ├─ Load token from localStorage on startup     │
+│    ├─ Store in state variable                      │
+│    └─ Re-hydrate Axios headers with token         │
+│ 3. Conditional Rendering:                         │
+│    ├─ If no token → render Login component        │
+│    └─ If token exists → render Dashboard component│
+│ 4. Provides setToken function to:                 │
+│    ├─ Update localStorage                         │
+│    ├─ Update Axios default headers                │
+│    └─ Update React state                          │
+└────────────────────────────────────────────────────┘
+
+LOGIN.JS (Authentication Component):
+├─ State Variables:
+│  ├─ email, password, adminSecret
+│  ├─ isSignup (toggle between login/signup)
+│  ├─ message, messageType (feedback messages)
+│
+├─ Form Fields:
+│  ├─ Email input
+│  ├─ Password input
+│  └─ Admin Secret input (only shown during signup)
+│
+├─ Authentication Flow:
+│  ├─ If signup mode: POST /auth/signup
+│  ├─ Then always: POST /auth/login
+│  ├─ On success: Call setToken(token) and show success
+│  └─ On error: Display error message
+│
+└─ Features:
+   ├─ Toggle between sign-up and login modes
+   └─ Clear admin secret when switching modes
+
+DASHBOARD.JS (Main Application Interface):
+├─ State Variables:
+│  ├─ sops: List of all available SOPs
+│  ├─ user: Current user info (email, role)
+│  ├─ answers: User's Q&A history
+│  ├─ documents: Uploaded documents (if feature exists)
+│  └─ selectedSop: Currently selected SOP
+│
+├─ On Mount:
+│  ├─ GET /auth/me → fetch current user
+│  ├─ GET /sops/ → fetch all SOPs
+│  ├─ GET /answers/ → fetch Q&A history
+│  └─ GET /documents/ → fetch documents
+│
+├─ Admin-Only Sections:
+│  ├─ SOPForm component (create new SOP)
+│  ├─ SOPEditor component (edit existing SOPs)
+│  └─ Delete buttons for SOPs
+│
+├─ User Sections (All Authenticated Users):
+│  ├─ AskAI component (ask questions)
+│  ├─ Dashboard displays Q&A history
+│  └─ Clear history button
+│
+└─ Functions:
+   ├─ refreshSOPs(), refreshAnswers(), refreshDocuments()
+   ├─ handleDeleteSOP(sopId)
+   ├─ handleClearHistory()
+   └─ onLogout callback
+
+SOPFORM.JS (Create/Edit SOP):
+├─ Purpose: Form interface for admin to create SOPs
+├─ Inputs:
+│  ├─ SOP Title (text input)
+│  ├─ SOP Content (textarea for full text)
+│  └─ Department name (text input)
+└─ Action: POST /sops/ with form data
+
+SOPDITOR.JS (Edit Existing SOP):
+├─ Purpose: Modify existing SOP content
+├─ Functionality: Similar to SOPForm but for updates
+└─ Action: PUT /sops/{id}
+
+ASKAI.JS (Question Interface):
+├─ Purpose: User asks questions about SOPs
+├─ Inputs:
+│  ├─ SOP Selector dropdown
+│  └─ Question text input
+├─ Flow:
+│  ├─ POST /questions/ with sop_id and question
+│  ├─ Display generated answer and sources
+│  └─ Store in component state
+└─ Output: Display answer, sources, and metadata
+
+API.JS (Axios Configuration):
+├─ Creates Axios instance
+├─ Sets default base URL (backend proxy)
+├─ Sets default headers if token exists in localStorage
+└─ All frontend HTTP requests go through this instance
+
+STYLES.CSS:
+├─ Component styling (auth-card, dashboard, buttons)
+├─ Layout styles
+├─ Form styling
+└─ Message/notification styles
+
+================================================================================
+9. BACKEND API ROUTES & ENDPOINTS
+================================================================================
+
+AUTHENTICATION ROUTES (/auth prefix):
+┌─────────────────────────────────────────────────────────────┐
+│ POST /auth/signup                                           │
+│ ├─ Public endpoint (no auth required)                      │
+│ ├─ Body: { email, password, admin_secret (optional) }     │
+│ ├─ Creates new User in database                            │
+│ ├─ Returns: { msg, role, email }                          │
+│ └─ HTTP: 201 (Created) or 400/401 (Error)                 │
+│                                                             │
+│ POST /auth/login                                            │
+│ ├─ Public endpoint (no auth required)                      │
+│ ├─ Body: { email, password }                              │
+│ ├─ Returns JWT token with user info                        │
+│ ├─ Returns: { access_token, user_id, email, role }       │
+│ └─ HTTP: 200 (OK) or 401 (Invalid credentials)           │
+│                                                             │
+│ GET /auth/me                                                │
+│ ├─ Protected (requires @jwt_required())                    │
+│ ├─ Returns current user's full profile                     │
+│ ├─ Returns: { id, email, role, ... }                      │
+│ └─ HTTP: 200 (OK) or 401 (Unauthorized)                  │
+└─────────────────────────────────────────────────────────────┘
+
+SOP MANAGEMENT ROUTES (/sops prefix):
+┌─────────────────────────────────────────────────────────────┐
+│ POST /sops/                                                  │
+│ ├─ Protected + Admin only                                   │
+│ ├─ Body: { title, content, department_id (optional) }    │
+│ ├─ Creates new SOP in database                             │
+│ ├─ Returns: { msg, id, title }                            │
+│ └─ HTTP: 201 (Created) or 403 (Not admin)                 │
+│                                                             │
+│ GET /sops/                                                   │
+│ ├─ Protected (any authenticated user)                      │
+│ ├─ Returns all SOPs                                        │
+│ ├─ Admin users can see all SOPs they created               │
+│ ├─ Regular users can see all SOPs for questioning          │
+│ ├─ Returns: [ {id, title, content, department, owner}, ...] │
+│ └─ HTTP: 200 (OK)                                          │
+│                                                             │
+│ GET /sops/my-sops                                            │
+│ ├─ Protected + Admin only                                   │
+│ ├─ Returns only SOPs created by current admin              │
+│ ├─ Returns: [ {SOP records...} ]                           │
+│ └─ HTTP: 200 (OK)                                          │
+│                                                             │
+│ GET /sops/{id}                                               │
+│ ├─ Protected (any authenticated user)                      │
+│ ├─ Returns specific SOP by ID                              │
+│ ├─ Returns: {id, title, content, owner, department, ...}  │
+│ └─ HTTP: 200 (OK) or 404 (Not found)                      │
+│                                                             │
+│ PUT /sops/{id}                                               │
+│ ├─ Protected + Admin only                                   │
+│ ├─ Body: { title (optional), content (optional) }         │
+│ ├─ Updates existing SOP                                    │
+│ ├─ Returns: {msg, id, updated SOP...}                     │
+│ └─ HTTP: 200 (OK) or 403/404 (Error)                      │
+│                                                             │
+│ DELETE /sops/{id}                                            │
+│ ├─ Protected + Admin only                                   │
+│ ├─ Deletes SOP and all associated QnALogs (cascade)      │
+│ ├─ Returns: { msg }                                        │
+│ └─ HTTP: 200 (OK) or 403/404 (Error)                      │
+└─────────────────────────────────────────────────────────────┘
+
+QUESTION ANSWERING ROUTES (/questions prefix):
+┌─────────────────────────────────────────────────────────────┐
+│ POST /questions/                                             │
+│ ├─ Protected (any authenticated user)                      │
+│ ├─ Body: { sop_id, question }                             │
+│ ├─ Calls RAG engine to generate answer                    │
+│ ├─ Stores Q&A in QnALog database                          │
+│ ├─ Returns: {answer, sources, sop_title, sop_owner}      │
+│ └─ HTTP: 200 (OK) or 400/404 (Error)                      │
+│                                                             │
+│ GET /questions/history                                      │
+│ ├─ Protected (any authenticated user)                      │
+│ ├─ Returns all Q&A history for current user               │
+│ ├─ Sorted by newest first                                  │
+│ ├─ Returns: [ {id, question, answer, sources,            │
+│ │              sop_title, created_at}, ... ]              │
+│ └─ HTTP: 200 (OK)                                          │
+│                                                             │
+│ GET /questions/{id}                                          │
+│ ├─ Protected (owner only)                                   │
+│ ├─ Returns specific Q&A record                            │
+│ ├─ Returns: {id, question, answer, sources, ...}        │
+│ └─ HTTP: 200 (OK) or 404/403 (Not found/Unauthorized)   │
+└─────────────────────────────────────────────────────────────┘
+
+ANSWERS ROUTE (/answers prefix):
+┌─────────────────────────────────────────────────────────────┐
+│ GET /answers/                                                │
+│ ├─ Protected (any authenticated user)                      │
+│ ├─ Returns all saved answers for current user              │
+│ ├─ May be alias for /questions/history                    │
+│ ├─ Returns: [ {answer records} ]                           │
+│ └─ HTTP: 200 (OK)                                          │
+└─────────────────────────────────────────────────────────────┘
+
+================================================================================
+10. APPLICATION WORKFLOW SUMMARY
+================================================================================
+
+TYPICAL USER JOURNEY - NEW USER:
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Visit frontend URL (localhost:3000)                      │
+│ 2. See Login component                                      │
+│ 3. Click "Switch to sign up" toggle                        │
+│ 4. Enter email, password (admin secret if becoming admin)  │
+│ 5. Click "Sign up" button                                  │
+│    └─ Frontend POST /auth/signup                            │
+│    └─ Backend creates User with role='user'               │
+│ 6. Frontend automatically calls POST /auth/login           │
+│ 7. Receives JWT token                                       │
+│ 8. Token saved to localStorage                             │
+│ 9. Redirected to Dashboard                                 │
+│ 10. Dashboard fetches available SOPs                       │
+│ 11. User can now ask questions                             │
+└─────────────────────────────────────────────────────────────┘
+
+TYPICAL USER JOURNEY - ASKING A QUESTION:
+┌─────────────────────────────────────────────────────────────┐
+│ 1. User logged in, viewing Dashboard                       │
+│ 2. AskAI component displays SOP dropdown                    │
+│ 3. User selects an SOP                                     │
+│ 4. User types question (e.g., "How to handle an incident?")│
+│ 5. User clicks "Ask" button                                │
+│    └─ Frontend POST /questions/ with {sop_id, question}   │
+│    └─ Backend calls run_rag(question, sop.content)        │
+│    └─ RAG engine scores sentences and returns best match  │
+│    └─ Backend creates QnALog record                       │
+│ 6. Frontend receives answer response                       │
+│ 7. Answer displayed with source excerpt                    │
+│ 8. Record stored in user's Q&A history                     │
+│ 9. User can view similar questions later in history       │
+└─────────────────────────────────────────────────────────────┘
+
+TYPICAL ADMIN WORKFLOW:
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Admin signs up with admin_secret (role='admin')         │
+│ 2. Dashboard shows SOP creation options                     │
+│ 3. Admin clicks "Create New SOP"                           │
+│ 4. SOPForm displays with title/content fields             │
+│ 5. Admin enters SOP details                                │
+│ 6. Click "Save" button                                     │
+│    └─ Frontend POST /sops/ with {title, content}          │
+│    └─ Backend verifies user.is_admin()                     │
+│    └─ Creates SOP with owner_id=admin's user_id           │
+│ 7. SOP saved and visible to all users                      │
+│ 8. Admin can later:                                         │
+│    ├─ Edit SOP content (PUT /sops/{id})                   │
+│    ├─ Delete SOP (DELETE /sops/{id})                      │
+│    └─ View SOPs they created (GET /sops/my-sops)          │
+└─────────────────────────────────────────────────────────────┘
+
+================================================================================
+11. DEPLOYMENT & CONFIGURATION
+================================================================================
+
+DEVELOPMENT SETUP:
+
+Backend:
+  1. Create Python virtual environment
+  2. Install dependencies: pip install -r requirements.txt
+  3. Create .env file with:
+     - DATABASE_URL (optional, defaults to SQLite)
+     - JWT_SECRET_KEY (defaults to development key)
+     - ADMIN_SECRET (defaults to 'admin-secret-key-change-me')
+     - FLASK_DEBUG (set to 1 for auto-reload)
+  4. Run: python app.py
+  5. Backend server starts on http://localhost:5000
+
+Frontend:
+  1. Navigate to frontend directory
+  2. Install dependencies: npm install
+  3. Start development server: npm start
+  4. Frontend runs on http://localhost:3000
+  5. Proxy setting in package.json routes API calls to localhost:5000
+
+DATABASE CONFIGURATION:
+
+SQLite (Default):
+  - File: instance/sop_db.sqlite
+  - No configuration needed
+  - Best for development and small deployments
+
+PostgreSQL (Production):
+  - Set DATABASE_URL environment variable
+  - Example: DATABASE_URL=postgresql://user:password@localhost/sopdb
+  - psycopg2-binary installed in requirements.txt
+
+Schema Creation:
+  - Flask-SQLAlchemy creates tables automatically on startup
+  - db.create_all() in app.py creates all tables from models
+  - Column additions via ensure_sqlite_column() for backwards compatibility
+
+SECURITY CONSIDERATIONS:
+
+JWT Tokens:
+  - Change JWT_SECRET_KEY in production (strong random string)
+  - Tokens stored in browser localStorage
+  - Include "Bearer {token}" in Authorization header
+
+Admin Secret:
+  - Change ADMIN_SECRET from default value
+  - Only needed during admin account creation
+  - Can disable signup after first admin is created
+
+Password Storage:
+  - All passwords hashed using werkzeug.security
+  - Never stored as plaintext
+  - check_password_hash() used for verification
+
+CORS Configuration:
+  - Currently allows all origins: {'origins': '*'}
+  - In production, restrict to specific domains
+  - Example: CORS(app, resources={r'/*': {'origins': ['https://yourdomain.com']}})
+
+================================================================================
+12. KEY FILES & THEIR PURPOSES
+================================================================================
+
+BACKEND FILES:
+
+app.py
+  └─ Flask application initialization
+  ├─ Database configuration (SQLite/PostgreSQL)
+  ├─ Blueprint registration for routes
+  ├─ CORS and JWT setup
+  └─ Database initialization on startup
+
+db.py
+  └─ SQLAlchemy database instance creation
+  └─ Shared across all models
+
+models.py
+  ├─ User model (authentication, roles)
+  ├─ Department model (SOP organization)
+  ├─ SOP model (standard operating procedures)
+  └─ QnALog model (question & answer history)
+
+rag.py
+  └─ Retrieval-Augmented Generation engine
+  ├─ Tokenization function
+  ├─ Sentence scoring algorithm
+  ├─ Answer generation from SOP content
+  └─ Source excerpt extraction
+
+routes/auth.py
+  ├─ /signup endpoint (user registration)
+  ├─ /login endpoint (authentication)
+  └─ /me endpoint (current user info)
+
+routes/sops.py
+  ├─ POST /sops/ (create SOP - admin only)
+  ├─ GET /sops/ (list all SOPs)
+  ├─ GET /sops/my-sops (list own SOPs - admin)
+  ├─ GET /sops/{id} (get specific SOP)
+  ├─ PUT /sops/{id} (update SOP - admin)
+  └─ DELETE /sops/{id} (delete SOP - admin)
+
+routes/questions.py
+  ├─ POST /questions/ (ask question about SOP)
+  ├─ GET /questions/history (user's Q&A history)
+  └─ GET /questions/{id} (get specific Q&A)
+
+routes/answers.py
+  └─ GET /answers/ (fetch answer history)
+
+requirements.txt
+  ├─ Flask, Flask-SQLAlchemy, Flask-JWT-Extended
+  ├─ Flask-CORS, Werkzeug, psycopg2-binary
+  └─ All Python dependencies
+
+FRONTEND FILES:
+
+public/index.html
+  └─ HTML entry point for React app
+
+src/index.js
+  └─ React app initialization
+  └─ Renders App component into DOM
+
+src/App.js
+  └─ Main React component
+  ├─ Authentication state management
+  ├─ Token persistence in localStorage
+  ├─ Conditional rendering (Login vs Dashboard)
+  └─ Token setter function
+
+src/api.js
+  └─ Axios HTTP client configuration
+  ├─ Default base URL setup
+  ├─ Authorization header management
+  └─ Used by all components for API calls
+
+src/styles.css
+  └─ Global stylesheet
+  ├─ Component-level styles
+  └─ Responsive design
+
+src/components/Login.js
+  └─ Authentication UI component
+  ├─ Sign up and login forms
+  ├─ Admin secret input
+  └─ Message feedback system
+
+src/components/Dashboard.js
+  └─ Main application interface
+  ├─ SOP management section (admin)
+  ├─ Question asking section (all users)
+  ├─ Q&A history display
+  └─ Component composition
+
+src/components/SOPForm.js
+  └─ Form for creating new SOPs (admin)
+  ├─ Title input, content textarea
+  ├─ Department selection
+  └─ Submit to backend
+
+src/components/SOPEditor.js
+  └─ Form for editing existing SOPs (admin)
+  └─ Similar to SOPForm but for updates
+
+src/components/AskAI.js
+  └─ Question interface for users
+  ├─ SOP selector dropdown
+  ├─ Question input
+  └─ Answer display with sources
+
+package.json
+  ├─ Project metadata
+  ├─ React and build tool dependencies
+  ├─ Start and build scripts
+  └─ Proxy configuration for backend
+
+================================================================================
+13. TECHNOLOGIES EXPLAINED
+================================================================================
+
+FLASK:
+  - Lightweight Python web framework
+  - Handles HTTP requests/responses
+  - Route decorators (@app.route, @bp.route)
+  - Request/response processing
+  - Error handling
+
+FLASK-SQLALCHEMY:
+  - ORM (Object-Relational Mapping) for Python
+  - Maps Python classes to database tables
+  - Handles queries, relationships, and transactions
+  - Automatic database schema generation
+
+FLASK-JWT-EXTENDED:
+  - Implements JWT (JSON Web Tokens) for auth
+  - create_access_token() generates tokens
+  - @jwt_required() protects routes
+  - get_jwt_identity() extracts user ID from token
+
+FLASK-CORS:
+  - Enables Cross-Origin Resource Sharing
+  - Allows frontend (different port) to call backend
+  - Prevents CORS errors in browser
+
+WERKZEUG:
+  - Utility library for Python web apps
+  - Password hashing (generate_password_hash, check_password_hash)
+  - Secure password comparison (prevents timing attacks)
+
+REACT:
+  - JavaScript library for building UIs
+  - Component-based architecture
+  - State management for dynamic updates
+  - JSX syntax for HTML-like code
+
+AXIOS:
+  - Promise-based HTTP client
+  - Handles API calls to backend
+  - Automatic header and body serialization
+  - Error handling and interceptors
+
+SQLITE:
+  - Lightweight file-based database
+  - No server setup needed
+  - Good for development and small deployments
+  - File stored as sop_db.sqlite
+
+POSTGRESQL:
+  - Production-grade relational database
+  - Scalable and robust
+  - Used when DATABASE_URL environment variable is set
+  - psycopg2-binary is Python driver
+
+================================================================================
+14. HOW DATA FLOWS THROUGH THE SYSTEM
+================================================================================
+
+USER ASKING A QUESTION - DATA FLOW:
+
+Browser (Frontend)
+    ↓
+    │ POST /questions/ with {sop_id: 5, question: "incident handling"}
+    ↓
+Flask Server (Backend)
+    ├─ routes/questions.py asks_question()
+    ├─ Verify JWT token is valid ✓
+    ├─ Extract sop_id=5, question text
+    ├─ Query database: SOP.query.get(5)
+    │  ├─ Retrieve: title, content (full SOP text)
+    │  └─ Store in `sop` variable
+    ├─ Call run_rag(question, sop.content)
+    │
+    ├─ RAG Engine Processing:
+    │  ├─ Tokenize question → ["incident", "handling"]
+    │  ├─ Split SOP into sentences
+    │  ├─ Score each sentence against question tokens
+    │  │  (token overlap, phrase matching, similarity)
+    │  ├─ Find sentence with highest score
+    │  └─ Return: answer, source_excerpt
+    │
+    ├─ Create QnALog record:
+    │  ├─ question: "incident handling"
+    │  ├─ answer: "According to the SOP, [best sentence]"
+    │  ├─ sources: "[source excerpt]"
+    │  ├─ user_id: 42 (from JWT)
+    │  ├─ sop_id: 5
+    │  └─ created_at: 2024-07-16 10:30:00
+    │
+    ├─ Save to database (commit)
+    │
+    └─ Return JSON response:
+       {
+         "answer": "According to the SOP, ...",
+         "sources": "When an incident occurs, ...",
+         "sop_title": "Incident Response Guide",
+         "sop_owner": "admin@company.com"
+       }
+    ↑
+Browser (Frontend) receives response
+    ├─ AskAI component gets JSON
+    ├─ Display answer in UI
+    ├─ Show source excerpt
+    ├─ Store in component state
+    └─ Add to Q&A history display
+
+================================================================================
+15. EXAMPLE SCENARIOS
+================================================================================
+
+SCENARIO 1: New Company Uses SOP Assistant
+
+Week 1:
+  1. Company admin creates account with admin_secret
+  2. Admin creates 5 SOPs:
+     - "IT Incident Response"
+     - "HR Leave Policy"
+     - "Finance Expense Approval"
+     - "Customer Support Guidelines"
+     - "Office Safety Rules"
+
+Week 2:
+  1. Employees sign up (role='user')
+  2. User1: "How do I report an incident?"
+     - Selects "IT Incident Response" SOP
+     - Asks question → RAG finds answer from SOP
+     - Answer: "Report through ticketing system to IT support..."
+  3. User2: "What is the dress code policy?"
+     - Selects "Office Safety Rules"
+     - Gets answer from SOP content
+
+Ongoing:
+  - All Q&A is logged and searchable
+  - Admin can track which topics users ask about
+  - Admin updates SOPs based on feedback
+  - New employees can find answers independently
+
+SCENARIO 2: Admin Updates SOP
+
+Before:
+  - SOP: "Incident Response" with outdated escalation path
+  - Users asking: "Who do I contact for critical incidents?"
+
+Process:
+  1. Admin opens Dashboard
+  2. Clicks "Edit" on "Incident Response" SOP
+  3. Updates escalation procedure in content
+  4. Saves changes (PUT /sops/{id})
+  5. Next user asks similar question
+  6. RAG finds updated content → provides new answer
+  7. No need for user training; answer automatically updated
+
+SCENARIO 3: Company Adds New Department
+
+Situation:
+  - Company hires new finance team
+  - Admin needs to create finance-specific SOPs
+
+Process:
+  1. Admin creates new Department: "Finance"
+  2. Admin creates SOP under Finance department:
+     - Title: "Expense Reimbursement Process"
+     - Content: Detailed expense procedures
+  3. Finance team members ask questions
+  4. RAG provides consistent guidance based on SOP
+  5. Admin can later view /sops/my-sops to see all created SOPs
+
+================================================================================
+16. STRENGTHS & LIMITATIONS
+================================================================================
+
+STRENGTHS:
+✓ Simple and lightweight implementation
+✓ Fast setup and deployment (minimal dependencies)
+✓ Role-based access control (admin/user)
+✓ Persistent Q&A history for audit trail
+✓ Flexible database options (SQLite for dev, PostgreSQL for prod)
+✓ JWT-based stateless authentication
+✓ Easy to understand codebase for maintenance
+✓ CORS enabled for frontend/backend separation
+
+LIMITATIONS:
+✗ RAG engine is basic (no semantic embeddings)
+  - Uses token overlap instead of AI embeddings
+  - May miss relevant content with different vocabulary
+  - Doesn't understand meaning, only surface similarity
+
+✗ No document upload feature (SOPs created manually)
+  - Cannot import existing Word/PDF documents
+  - All content must be typed or pasted
+
+✗ No full-text search capability
+  - Users must ask natural language questions
+  - Cannot browse SOP content directly
+
+✗ Limited scalability
+  - No caching mechanism
+  - No pagination for large SOP lists
+  - No load balancing support
+
+✗ No audit logging beyond Q&A
+  - Admin actions not logged
+  - Cannot track who modified what SOP or when
+
+✗ Minimal UI/UX polish
+  - Basic styling
+  - No rich text editor for SOPs
+  - No markdown support
+
+FUTURE IMPROVEMENTS:
+→ Implement semantic search using embeddings (OpenAI, Hugging Face)
+→ Add document upload and parsing (PDF, Word)
+→ Full-text search across SOP content
+→ Audit logging for all admin actions
+→ Rich text editor with markdown support
+→ SOP versioning and change history
+→ Team collaboration features
+→ Analytics dashboard for usage patterns
+→ Integration with external knowledge bases
+→ Mobile app
+
+================================================================================
+17. SECURITY & COMPLIANCE NOTES
+================================================================================
+
+CURRENT SECURITY MEASURES:
+✓ JWT authentication for protected routes
+✓ Password hashing with Werkzeug
+✓ Role-based access control
+✓ CORS enabled for frontend isolation
+✓ Protected admin endpoints
+
+SECURITY GAPS (TO ADDRESS IN PRODUCTION):
+⚠ JWT secret is hardcoded default if not set via env var
+⚠ Admin secret exposed in signup request (not hashed)
+⚠ No rate limiting on login attempts (brute force risk)
+⚠ No HTTPS enforcement (use reverse proxy in production)
+⚠ No session timeout (tokens valid indefinitely)
+⚠ Sensitive info could be logged
+⚠ No database encryption at rest
+⚠ No API key for service-to-service auth
+
+GDPR CONSIDERATIONS:
+- User data stored: email, password hash, Q&A history
+- No consent management in current implementation
+- No data export/deletion mechanisms
+- Should add user preference for data retention
+- Document privacy policy
+
+RECOMMENDATIONS FOR PRODUCTION:
+1. Use environment variables for all secrets
+2. Enforce HTTPS via reverse proxy (Nginx, Apache)
+3. Implement rate limiting (Flask-Limiter)
+4. Add session expiration to JWT tokens
+5. Use PostgreSQL instead of SQLite
+6. Enable database SSL/TLS connections
+7. Implement audit logging
+8. Add monitoring and alerting
+9. Regular security audits and penetration testing
+10. Keep dependencies updated
+
+================================================================================
+18. TESTING
+================================================================================
+
+CURRENT TESTING:
+- smoke_test.py: Basic functionality tests
+- test_end_to_end.py: End-to-end test scenarios
+- Manual testing via Postman/curl
+
+TEST COVERAGE AREAS:
+- Authentication (signup, login, token validation)
+- SOP CRUD operations (create, read, update, delete)
+- Question answering (RAG engine scoring)
+- Authorization (admin vs user permissions)
+- Data persistence (database operations)
+
+POTENTIAL TEST GAPS:
+- No performance/load testing
+- No security testing
+- Limited error condition testing
+- No frontend unit tests
+- No integration testing with mocked database
+
+================================================================================
+19. MAINTENANCE & OPERATIONS
+================================================================================
+
+BACKUP & RECOVERY:
+- SQLite: Copy sop_db.sqlite file regularly
+- PostgreSQL: Use pg_dump for backups
+- Consider automated nightly backups
+- Test recovery procedures
+
+MONITORING:
+- Flask logs to console by default
+- No centralized logging system
+- Should implement structured logging
+- Monitor database performance
+- Track API response times
+
+DEBUGGING:
+- Set FLASK_DEBUG=1 for development
+- Use Flask CLI and shell
+- Inspect database with SQLite Browser or psql
+- Browser DevTools for frontend debugging
+
+TROUBLESHOOTING COMMON ISSUES:
+1. Token not working
+   → Check JWT_SECRET_KEY matches
+   → Verify token in localStorage
+   → Check token expiration
+
+2. CORS errors
+   → Check frontend origin in request
+   → Verify CORS configuration in app.py
+
+3. Database issues
+   → Check DATABASE_URL if using PostgreSQL
+   → Verify file permissions for SQLite
+   → Check foreign key constraints
+
+4. Questions getting generic answers
+   → RAG engine scoring may need tuning
+   → Check SOP content quality
+   → May need semantic search instead
+
+================================================================================
+20. PROJECT STRUCTURE & FILE ORGANIZATION
+================================================================================
+
+sop-assistant/
+├─ README.md (project documentation)
+├─ .env.example (environment variable template)
+│
+├─ backend/
+│  ├─ app.py (Flask application entry point)
+│  ├─ db.py (SQLAlchemy database instance)
+│  ├─ models.py (User, Department, SOP, QnALog)
+│  ├─ rag.py (RAG engine implementation)
+│  ├─ requirements.txt (Python dependencies)
+│  ├─ smoke_test.py (basic tests)
+│  │
+│  ├─ routes/
+│  │  ├─ auth.py (authentication routes)
+│  │  ├─ sops.py (SOP management routes)
+│  │  ├─ questions.py (Q&A routes)
+│  │  └─ answers.py (answer history routes)
+│  │
+│  ├─ services/
+│  │  └─ (service modules for business logic)
+│  │
+│  ├─ tests/
+│  │  └─ test_end_to_end.py (integration tests)
+│  │
+│  └─ instance/
+│     └─ sop_db.sqlite (SQLite database file)
+│
+└─ frontend/
+   ├─ package.json (Node.js dependencies, proxy config)
+   ├─ public/
+   │  └─ index.html (HTML entry point)
+   │
+   └─ src/
+      ├─ index.js (React entry point)
+      ├─ App.js (main React component)
+      ├─ api.js (Axios HTTP configuration)
+      ├─ styles.css (global styles)
+      │
+      └─ components/
+         ├─ Login.js (authentication UI)
+         ├─ Dashboard.js (main interface)
+         ├─ SOPForm.js (create SOP)
+         ├─ SOPEditor.js (edit SOP)
+         └─ AskAI.js (ask questions)
+
+================================================================================
+CONCLUSION
+================================================================================
+
+The SOP Assistant is a modern web application that bridges the gap between
+organizations and their employees by providing instant access to standard
+operating procedures through natural language question answering.
+
+KEY TAKEAWAYS:
+1. Frontend (React) + Backend (Flask) architecture
+2. JWT-based authentication with role-based access control
+3. SQLAlchemy ORM for database operations
+4. Custom RAG engine for answer generation
+5. Simple but effective system design
+6. Easy to maintain and extend
+
+The application demonstrates solid software engineering practices including
+separation of concerns, authentication/authorization patterns, RESTful API
+design, and database relationship modeling.
+
+While the RAG engine could be improved with semantic embeddings, the current
+implementation provides a solid foundation for teams to centralize and share
+their standard operating procedures effectively.
+
+================================================================================
+END OF DOCUMENT
+================================================================================
