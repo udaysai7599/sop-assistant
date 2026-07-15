@@ -3,12 +3,9 @@ import axios from '../api';
 import SOPForm from './SOPForm';
 import AskAI from './AskAI';
 import SOPEditor from './SOPEditor';
-import DocumentUpload from './DocumentUpload';
-import DocumentPreview from './DocumentPreview';
 
 function Dashboard({ token, onLogout }) {
   const [sops, setSops] = useState([]);
-  const [documents, setDocuments] = useState([]);
   const [answers, setAnswers] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,17 +43,10 @@ function Dashboard({ token, onLogout }) {
       .catch(() => setAnswers([]));
   };
 
-  const refreshDocuments = () => {
-    axios.get('/documents/')
-      .then(res => setDocuments(res.data))
-      .catch(() => setDocuments([]));
-  };
-
   useEffect(() => {
     if (user) {
       refreshSOPs();
       refreshAnswers();
-      refreshDocuments();
     }
   }, [user, token]);
 
@@ -102,10 +92,7 @@ function Dashboard({ token, onLogout }) {
 
       {/* Admin-only: SOP Creation Form */}
       {user.is_admin && (
-        <>
-          <SOPForm onCreated={() => { refreshSOPs(); refreshAnswers(); }} />
-          <DocumentUpload onUploaded={() => { refreshDocuments(); }} />
-        </>
+        <SOPForm onCreated={() => { refreshSOPs(); refreshAnswers(); }} />
       )}
 
       {/* Available SOPs Section */}
@@ -151,9 +138,6 @@ function Dashboard({ token, onLogout }) {
           ))
         )}
       </div>
-
-      {/* Uploaded documents section */}
-      <DocumentPreview documents={documents} />
 
       {/* Answers/Q&A History Section */}
       <div className="section-card">
