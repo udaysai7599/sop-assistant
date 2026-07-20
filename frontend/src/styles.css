@@ -178,6 +178,36 @@ textarea {
   line-height: 1.5;
 }
 
+.document-list {
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.document-list ul {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
+.document-list a,
+.answer-item a,
+.answer-box a {
+  color: #60a5fa;
+}
+
+.document-upload-panel {
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.document-upload-panel input,
+.document-upload-panel button {
+  margin-top: 8px;
+}
+
 @media (max-width: 768px) {
   .dashboard-header, .sop-card {
     flex-direction: column;

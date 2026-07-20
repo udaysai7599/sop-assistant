@@ -34,6 +34,9 @@ function SOPForm({ onCreated }) {
   return (
     <div className="section-card">
       <h3>📝 Create New SOP (Admin Only)</h3>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Step 1: Create and save SOP text here. Step 2: Use the Upload document panel shown in that SOP card below.
+      </p>
       <input 
         placeholder="SOP title" 
         value={title} 

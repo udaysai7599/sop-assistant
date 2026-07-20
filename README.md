@@ -1,84 +1,193 @@
 # SOP Assistant
 
-## Project description
-SOP Assistant is a lightweight internal knowledge assistant for teams that need fast access to standard operating procedures. Admins can create and manage SOP documents, while employees can ask natural-language questions and receive guidance grounded in the stored SOP content.
+## 1) Project Brief Alignment and Scope
 
-## Problem and target user
-Many organizations keep SOPs in scattered documents or static wikis, which makes it difficult for employees to find guidance quickly during time-sensitive work. This project targets operations teams, support staff, HR teams, and other internal users who need reliable answers without manually searching through long documents.
+### Problem
+Teams often store SOPs in long documents that are difficult to search during time-sensitive tasks. This slows response time and creates inconsistent execution.
 
-## Features
-- Admin-managed SOP creation, editing, and deletion
-- Authenticated question answering over stored SOP content
-- Basic RAG-style retrieval using sentence scoring
-- User-specific Q&A history
-- Simple React frontend with a Flask backend
+### Target user
+- Operations team members who need quick answers from SOPs
+- Team leads/admins who maintain SOP quality and ownership
 
-## Tech stack
-- Frontend: React, Axios, CSS
-- Backend: Flask, Flask-SQLAlchemy, Flask-JWT-Extended, Flask-CORS
-- Data store: SQLite by default, with support for PostgreSQL via DATABASE_URL
-- Testing: Python unittest
+### MVP
+- Authenticated users can sign up, log in, and ask SOP questions
+- Admin users can create/update/delete SOPs
+- System stores user-specific Q&A history with evidence sources
 
-## Setup instructions
-1. Clone the repository.
-2. Create a Python virtual environment and install backend dependencies:
-   - `cd backend`
-   - `python -m venv .venv`
-   - `source .venv/bin/activate` (or `.venv\Scripts\activate` on Windows)
-   - `pip install -r requirements.txt`
-3. Install frontend dependencies:
-   - `cd frontend`
-   - `npm install`
-4. Copy the backend example environment file and update the values:
-   - `cp .env.example .env` (or copy the file in Windows)
+### Final scope (implemented)
+- Role-based authentication (`admin`, `user`) with protected routes
+- SQL relational model for users, SOPs, departments, and Q&A logs
+- Source-backed RAG retrieval over SOP content with confidence signal
+- Full React + Flask flow for auth, SOP management, asking, and history
 
-## Run instructions
+## 2) Core Features
+
+- Email/password signup and login
+- Admin elevation via configured secret during signup
+- Persistent JWT session handling in frontend
+- Admin-only SOP CRUD with ownership checks on update/delete
+- User question answering over SOP content
+- Source-backed answers with top evidence snippets and confidence level
+- User-scoped Q&A history and server-side history clearing
+
+## 3) Tech Stack
+
 ### Backend
-- `cd backend`
-- `python app.py`
+- Flask
+- Flask-SQLAlchemy
+- Flask-JWT-Extended
+- Flask-CORS
+- SQLite (default) or PostgreSQL via `DATABASE_URL`
 
 ### Frontend
-- `cd frontend`
-- `npm start`
+- React (CRA)
+- Axios
 
-The frontend uses the proxy setting in package.json and will communicate with the Flask backend on localhost:5000 by default.
+### Testing
+- Python `unittest` end-to-end integration tests
 
-## Required environment variables
-Create a .env file in the backend folder with values similar to:
-- `DATABASE_URL`: Optional database URI for PostgreSQL or SQLite override
-- `JWT_SECRET_KEY`: Secret used to sign authentication tokens
-- `ADMIN_SECRET`: Secret used for creating the first admin account
-- `FLASK_DEBUG`: Set to `1` for local development debugging
-- `APP_HOST` and `APP_PORT`: Optional host and port overrides
+## 4) Repository Structure
 
-## API route descriptions
-- `POST /auth/signup`: Create a user account; optionally grant admin role using `admin_secret`
-- `POST /auth/login`: Authenticate and receive a JWT
-- `GET /auth/me`: Return the current authenticated user profile
-- `POST /sops/`: Create a new SOP (admin-only)
-- `GET /sops/`: List all available SOPs
-- `GET /sops/my-sops`: List only the current admin’s SOPs
-- `PUT /sops/<id>` and `DELETE /sops/<id>`: Update or remove an SOP
-- `POST /questions/`: Ask a question about a specific SOP
-- `GET /questions/history`: Fetch the current user’s question history
-- `GET /answers/`: Fetch saved answer history
+- `backend/app.py`: Flask app bootstrap and config
+- `backend/models.py`: SQLAlchemy models and relationships
+- `backend/routes/auth.py`: signup/login/me/logout
+- `backend/routes/sops.py`: SOP CRUD + ownership authorization
+- `backend/routes/questions.py`: question answering and history
+- `backend/routes/answers.py`: answer history listing/detail/clear
+- `backend/rag.py`: retrieval scoring + source-backed answer synthesis
+- `backend/tests/test_end_to_end.py`: integration tests
+- `frontend/src/components/*`: auth, dashboard, SOP CRUD UI, Ask AI
 
-## Data model description
-- `User`: Stores account email, password hash, role, and relationships to SOPs and Q&A logs
-- `Department`: Groups SOPs into departments such as IT, HR, or Finance
-- `SOP`: Contains the SOP title, content, owner, and department
-- `QnALog`: Stores asked questions, generated answers, source excerpts, and timestamps
+## 5) Environment Variables
 
-## Auth flow explanation
-Users sign up or log in through the frontend. The backend validates credentials, issues a JWT, and later verifies that token for protected routes. Admin privileges are granted when the provided `admin_secret` matches the configured value.
+Create `backend/.env`:
 
-## AI/RAG workflow explanation
-The question-answering flow loads the selected SOP’s content, splits it into sentences, and scores each sentence against the user’s question using token overlap and similarity heuristics. The best-matching sentence is returned as the answer, and the excerpt is saved as the source evidence for the Q&A log.
+- `DATABASE_URL`: Optional. Example: `postgresql://user:pass@localhost/sop_db`
+- `JWT_SECRET_KEY`: Required for production. Token signing secret
+- `ADMIN_SECRET`: Required for controlled admin signup
+- `JWT_ACCESS_TOKEN_EXPIRES_HOURS`: Optional, default `8`
+- `FLASK_DEBUG`: Optional, set `1` in development
+- `APP_HOST`: Optional host override
+- `APP_PORT`: Optional port override
 
-## Example questions or user tasks
-- “How should I handle an incident?”
-- “What is the approval workflow for expense reimbursement?”
-- “Who should I contact when the production service is down?”
+A template is provided in `backend/.env.example`.
 
-## Deployment notes
-The current version is intended for internal use and local development. In production, you should replace the default secrets, use a managed database such as PostgreSQL, and consider a more robust retrieval engine or embedding-based search for large SOP collections.
+## 6) Local Setup and Run
+
+### Backend
+1. `cd backend`
+2. `python -m venv .venv`
+3. Windows: `.venv\Scripts\activate`
+4. `pip install -r requirements.txt`
+5. `python app.py`
+
+### Frontend
+1. `cd frontend`
+2. `npm install`
+3. `npm start`
+
+Default URLs:
+- Backend: `http://localhost:5000`
+- Frontend: `http://localhost:3000`
+
+## 7) Authentication and Authorization Flow
+
+1. User signs up with email/password.
+2. If signup includes matching `admin_secret`, account is created as `admin`.
+3. User logs in and receives JWT access token.
+4. Frontend stores token and sends it on protected API requests.
+5. Backend enforces:
+- Auth required for SOP read/ask/history endpoints
+- Admin required for SOP create
+- Owner-admin required for SOP update/delete
+- User-scoped access for Q&A history and answer detail
+
+## 8) SQL Data Model
+
+### `User`
+- `id`, `email` (unique), `password_hash`, `role`
+- Relationships: owns many `SOP`, owns many `QnALog`
+
+### `Department`
+- `id`, `name` (unique)
+- Relationship: has many `SOP`
+
+### `SOP`
+- `id`, `title`, `content`, `department_id`, `owner_id`
+- Relationship: has many `QnALog`
+
+### `QnALog`
+- `id`, `question`, `answer`, `sources`, `created_at`, `user_id`, `sop_id`
+- Stores source evidence as JSON in `sources`
+
+## 9) API Routes
+
+### Auth
+- `POST /auth/signup`
+- `POST /auth/login`
+- `GET /auth/me`
+- `POST /auth/logout`
+
+### SOPs
+- `POST /sops/` (admin only)
+- `GET /sops/`
+- `GET /sops/my-sops` (admin only)
+- `GET /sops/<id>`
+- `PUT /sops/<id>` (owner-admin only)
+- `DELETE /sops/<id>` (owner-admin only)
+
+### Questions / Answers
+- `POST /questions/` (ask question; supports `sop_id` or cross-SOP retrieval)
+- `GET /questions/history`
+- `GET /questions/<id>`
+- `GET /answers/`
+- `GET /answers/<id>`
+- `DELETE /answers/` (clear current user history)
+
+## 10) RAG Workflow (Source-Backed)
+
+1. Collect candidate SOP content (selected SOP or all SOPs)
+2. Split SOP text into sentence chunks
+3. Score each chunk using:
+- lexical overlap recall
+- lexical overlap precision
+- fuzzy similarity
+4. Rank chunks and select top evidence (`top_k`)
+5. Build response from highest-ranked chunk and include supporting SOP titles
+6. Return answer + sources + confidence (`high` or `low`)
+7. Persist question, answer, and sources in `QnALog`
+
+Low-confidence behavior is explicit in the response so users can verify critical decisions.
+
+## 11) Verification and Tests
+
+Run backend integration tests:
+
+1. `cd backend`
+2. `python -m unittest tests/test_end_to_end.py`
+
+Covered flows:
+- Signup/login/create SOP/ask question/history
+- Ownership authorization (admin cannot delete another admin's SOP)
+- User-scoped history and clear-history behavior
+- Source-backed response structure
+
+## 12) Example User Tasks
+
+- "I am a user. I can ask: How do I handle repeated service outages?"
+- "I am an admin. I can create and edit IT, HR, and Finance SOPs."
+- "I can review my previous answers and source evidence in history."
+
+## 13) Known Limitations
+
+- Retrieval is lexical/fuzzy and not embedding-based semantic search
+- No token revocation list (logout is stateless)
+- No production deployment included in this submission by requirement
+
+## 14) Future Improvements
+
+- Add embedding-based retrieval and vector index for larger SOP corpora
+- Add refresh-token rotation and token revocation support
+- Add pagination/search filters for SOPs and history
+- Add CI pipeline with lint/test gates and coverage report
+- Add migration tooling (Alembic) for schema evolution

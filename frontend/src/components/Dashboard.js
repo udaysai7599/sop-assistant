@@ -10,6 +10,9 @@ function Dashboard({ token, onLogout }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedSop, setSelectedSop] = useState(null);
+  const [uploadFiles, setUploadFiles] = useState({});
+  const [uploadTitles, setUploadTitles] = useState({});
+  const [uploadMessages, setUploadMessages] = useState({});
 
   // Fetch current user info to check role
   useEffect(() => {
@@ -45,7 +48,9 @@ function Dashboard({ token, onLogout }) {
 
   useEffect(() => {
     if (user) {
-      refreshSOPs();
+      if (user.is_admin) {
+        refreshSOPs();
+      }
       refreshAnswers();
     }
   }, [user, token]);
@@ -63,7 +68,60 @@ function Dashboard({ token, onLogout }) {
 
   const handleClearHistory = () => {
     if (window.confirm('Are you sure you want to clear all Q&A history?')) {
-      setAnswers([]);
+      axios.delete('/answers/')
+        .then(() => refreshAnswers())
+        .catch((error) => {
+          alert(error.response?.data?.msg || 'Failed to clear history');
+        });
+    }
+  };
+
+  const downloadDocument = async (downloadUrl, fallbackName = 'document') => {
+    try {
+      const response = await axios.get(downloadUrl, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', fallbackName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      alert(error.response?.data?.msg || 'Failed to download document');
+    }
+  };
+
+  const handleUploadFileChange = (sopId, file) => {
+    setUploadFiles(prev => ({ ...prev, [sopId]: file }));
+  };
+
+  const handleUploadTitleChange = (sopId, value) => {
+    setUploadTitles(prev => ({ ...prev, [sopId]: value }));
+  };
+
+  const uploadDocument = async (sopId) => {
+    const file = uploadFiles[sopId];
+    if (!file) {
+      setUploadMessages(prev => ({ ...prev, [sopId]: 'Please choose a document file to upload.' }));
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('document_file', file);
+    formData.append('document_title', uploadTitles[sopId] || file.name);
+
+    try {
+      await axios.post(`/sops/${sopId}/documents`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setUploadFiles(prev => ({ ...prev, [sopId]: null }));
+      setUploadTitles(prev => ({ ...prev, [sopId]: '' }));
+      setUploadMessages(prev => ({ ...prev, [sopId]: 'Document uploaded successfully.' }));
+      refreshSOPs();
+      setTimeout(() => setUploadMessages(prev => ({ ...prev, [sopId]: '' })), 3000);
+    } catch (error) {
+      setUploadMessages(prev => ({ ...prev, [sopId]: error.response?.data?.msg || 'Upload failed.' }));
     }
   };
 
@@ -95,49 +153,104 @@ function Dashboard({ token, onLogout }) {
         <SOPForm onCreated={() => { refreshSOPs(); refreshAnswers(); }} />
       )}
 
-      {/* Available SOPs Section */}
-      <div className="section-card">
-        <h3>{user.is_admin ? 'All SOPs' : 'Available SOPs'}</h3>
-        {sops.length === 0 ? (
-          <p className="muted">{user.is_admin ? 'No SOPs created yet.' : 'No SOPs available yet.'}</p>
-        ) : (
-          sops.map(s => (
-            <div key={s.id} className="sop-card" style={{ flexDirection: 'column', gap: '12px' }}>
-              <div className="sop-info">
-                <div style={{ flex: 1 }}>
-                  <h4 style={{ margin: '0 0 8px 0' }}>{s.title}</h4>
-                  <p className="muted" style={{ margin: '4px 0' }}>Department: {s.department_name}</p>
-                  {s.owner_email && <p className="muted" style={{ margin: '4px 0' }}>Owner: {s.owner_email}</p>}
+      {/* Questioning experience */}
+      {user.is_admin ? (
+        <div className="section-card">
+          <h3>All SOPs</h3>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Document upload is available inside each SOP card after the SOP is created. Only the admin who created the SOP can upload documents for it.
+          </p>
+          {sops.length === 0 ? (
+            <p className="muted">No SOPs created yet. Create one above, then use its Upload document panel.</p>
+          ) : (
+            sops.map(s => (
+              <div key={s.id} className="sop-card" style={{ flexDirection: 'column', gap: '12px' }}>
+                <div className="sop-info">
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: '0 0 8px 0' }}>{s.title}</h4>
+                    <p className="muted" style={{ margin: '4px 0' }}>Department: {s.department_name}</p>
+                    {s.owner_email && <p className="muted" style={{ margin: '4px 0' }}>Owner: {s.owner_email}</p>}
+                    {user.is_admin && s.is_owner && (
+                      <p className="muted" style={{ margin: '4px 0' }}><em>(You created this)</em></p>
+                    )}
+                  </div>
                   {user.is_admin && s.is_owner && (
-                    <p className="muted" style={{ margin: '4px 0' }}><em>(You created this)</em></p>
+                    <div className="sop-actions">
+                      <button 
+                        className="icon-btn"
+                        title="View/Edit SOP"
+                        onClick={() => setSelectedSop(s)}
+                      >
+                        ✎
+                      </button>
+                      <button 
+                        className="icon-btn danger"
+                        title="Delete SOP"
+                        onClick={() => handleDeleteSOP(s.id)}
+                      >
+                        🗑
+                      </button>
+                    </div>
                   )}
                 </div>
+                <div className="sop-ask">
+                  <AskAI token={token} sopId={s.id} onAnswered={refreshAnswers} />
+                </div>
+                {Array.isArray(s.documents) && s.documents.length > 0 && (
+                  <div className="document-list">
+                    <strong>Documents</strong>
+                    <ul>
+                      {s.documents.map(doc => (
+                        <li key={doc.id}>
+                          <span>{doc.title || doc.original_filename}</span>
+                          {' '}
+                          <button
+                            className="secondary"
+                            style={{ width: 'auto', padding: '6px 10px', marginLeft: 8 }}
+                            onClick={() => downloadDocument(doc.download_url, doc.original_filename || doc.title || 'document')}
+                          >
+                            Download
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {user.is_admin && s.is_owner && (
-                  <div className="sop-actions">
-                    <button 
-                      className="icon-btn"
-                      title="View/Edit SOP"
-                      onClick={() => setSelectedSop(s)}
-                    >
-                      ✎
-                    </button>
-                    <button 
-                      className="icon-btn danger"
-                      title="Delete SOP"
-                      onClick={() => handleDeleteSOP(s.id)}
-                    >
-                      🗑
-                    </button>
+                  <div className="document-upload-panel">
+                    <h4 style={{ margin: '0 0 8px 0' }}>Upload document</h4>
+                    <input
+                      type="text"
+                      placeholder="Document title"
+                      value={uploadTitles[s.id] || ''}
+                      onChange={e => handleUploadTitleChange(s.id, e.target.value)}
+                    />
+                    <input
+                      type="file"
+                      accept=".txt,.md,.csv,.pdf,.doc,.docx"
+                      onChange={e => handleUploadFileChange(s.id, e.target.files[0])}
+                    />
+                    <button onClick={() => uploadDocument(s.id)}>Upload</button>
+                    {uploadMessages[s.id] && (
+                      <p className="message" style={{
+                        color: uploadMessages[s.id].startsWith('Document uploaded') ? '#388e3c' : '#d32f2f'
+                      }}>
+                        {uploadMessages[s.id]}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
-              <div className="sop-ask">
-                <AskAI token={token} sopId={s.id} onAnswered={refreshAnswers} />
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="section-card">
+          <h3>Ask AI</h3>
+          <p className="muted">Ask your question directly. The assistant will fetch the most relevant SOP guidance automatically.</p>
+          <AskAI token={token} onAnswered={refreshAnswers} />
+        </div>
+      )}
 
       {/* Answers/Q&A History Section */}
       <div className="section-card">
@@ -158,6 +271,28 @@ function Dashboard({ token, onLogout }) {
               <p className="muted">Asked at: {item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</p>
               <p><em>Q:</em> {item.question}</p>
               <p><em>A:</em> {item.answer}</p>
+              {Array.isArray(item.sources) && item.sources.length > 0 && (
+                <div>
+                  <p><em>Sources:</em></p>
+                  {item.sources.map((source, index) => (
+                    <p key={`${item.id}-src-${index}`} className="muted">
+                      [{index + 1}] {source.sop_title || 'SOP'}: {source.excerpt}
+                      {source.download_url ? (
+                        <>
+                          {' '}
+                          <button
+                            className="secondary"
+                            style={{ width: 'auto', padding: '6px 10px', marginLeft: 8 }}
+                            onClick={() => downloadDocument(source.download_url, source.document_title || 'source-document')}
+                          >
+                            Download source document
+                          </button>
+                        </>
+                      ) : null}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
           ))
         )}

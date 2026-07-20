@@ -1,6 +1,7 @@
 import os
 import sqlite3
 from pathlib import Path
+from datetime import timedelta
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -27,6 +28,7 @@ else:
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'sop-assistant-super-secret-key-2026')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES_HOURS', '8')))
 
 CORS(app, resources={r'/*': {'origins': '*'}})
 db.init_app(app)

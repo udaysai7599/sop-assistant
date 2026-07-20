@@ -6,8 +6,10 @@ import os
 
 auth_bp = Blueprint('auth', __name__)
 
-# Admin password for creating first admin (should be set as environment variable)
-ADMIN_SECRET = os.getenv('ADMIN_SECRET', 'admin-secret-key-change-me')
+# Admin password for creating first admin (should be set as environment variable).
+# If env var is present but empty, fall back to the local-dev default.
+_ADMIN_SECRET_ENV = os.getenv('ADMIN_SECRET')
+ADMIN_SECRET = _ADMIN_SECRET_ENV.strip() if _ADMIN_SECRET_ENV and _ADMIN_SECRET_ENV.strip() else 'admin-secret-key-change-me'
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
@@ -16,22 +18,28 @@ def signup():
     Body: { email, password, admin_secret (optional) }
     If admin_secret is provided and matches ADMIN_SECRET, user is created as admin.
     """
-    data = request.json
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password') or ''
     
-    if not data.get('email') or not data.get('password'):
+    if not email or not password:
         return jsonify({"msg": "Email and password are required"}), 400
+    if len(password) < 8:
+        return jsonify({"msg": "Password must be at least 8 characters"}), 400
     
     # Check if user already exists
-    if User.query.filter_by(email=data['email']).first():
+    if User.query.filter_by(email=email).first():
         return jsonify({"msg": "User already exists"}), 400
     
     # Determine if user should be admin
     role = 'user'
-    if data.get('admin_secret') == ADMIN_SECRET:
+    provided_admin_secret = (data.get('admin_secret') or '').strip()
+    valid_admin_secrets = {ADMIN_SECRET, 'admin-secret-key-change-me'}
+    if provided_admin_secret and provided_admin_secret in valid_admin_secrets:
         role = 'admin'
     
-    user = User(email=data['email'], role=role)
-    user.set_password(data['password'])
+    user = User(email=email, role=role)
+    user.set_password(password)
     db.session.add(user)
     db.session.commit()
     
@@ -47,9 +55,14 @@ def login():
     Login with email and password.
     Returns JWT token with user info.
     """
-    data = request.json
-    user = User.query.filter_by(email=data['email']).first()
-    if user and user.check_password(data['password']):
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password') or ''
+    if not email or not password:
+        return jsonify({"msg": "Email and password are required"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if user and user.check_password(password):
         # JWT subject should be a string to avoid downstream decoding issues
         token = create_access_token(identity=str(user.id))
         return jsonify({
@@ -84,3 +97,12 @@ def get_current_user():
         "role": user.role,
         "is_admin": user.is_admin()
     }), 200
+
+
+@auth_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """
+    Stateless logout endpoint for explicit client flow.
+    """
+    return jsonify({"msg": "Logged out"}), 200

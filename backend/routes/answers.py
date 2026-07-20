@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import QnALog, SOP
+from db import db
+import json
 
 answers_bp = Blueprint('answers', __name__)
 
@@ -18,11 +20,18 @@ def list_answers():
     payload = []
     for log in logs:
         sop = SOP.query.get(log.sop_id) if log.sop_id else None
+        parsed_sources = []
+        if log.sources:
+            try:
+                parsed_sources = json.loads(log.sources)
+            except json.JSONDecodeError:
+                parsed_sources = [{'sop_id': log.sop_id, 'sop_title': sop.title if sop else 'Unknown SOP', 'excerpt': log.sources, 'score': None}]
+
         payload.append({
             'id': log.id,
             'question': log.question,
             'answer': log.answer,
-            'sources': log.sources,
+            'sources': parsed_sources,
             'sop_title': sop.title if sop else 'Unknown SOP',
             'sop_id': log.sop_id,
             'created_at': log.created_at.isoformat() if log.created_at else None
@@ -49,11 +58,30 @@ def get_answer(answer_id):
     
     sop = SOP.query.get(log.sop_id) if log.sop_id else None
     
+    parsed_sources = []
+    if log.sources:
+        try:
+            parsed_sources = json.loads(log.sources)
+        except json.JSONDecodeError:
+            parsed_sources = [{'sop_id': log.sop_id, 'sop_title': sop.title if sop else 'Unknown SOP', 'excerpt': log.sources, 'score': None}]
+
     return jsonify({
         'id': log.id,
         'question': log.question,
         'answer': log.answer,
-        'sources': log.sources,
+        'sources': parsed_sources,
         'sop_title': sop.title if sop else 'Unknown SOP',
         'created_at': log.created_at.isoformat() if log.created_at else None
     }), 200
+
+
+@answers_bp.route('/', methods=['DELETE'])
+@jwt_required()
+def clear_answers():
+    """
+    Delete all Q&A history for the current user.
+    """
+    user_id = int(get_jwt_identity())
+    QnALog.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify({'msg': 'History cleared'}), 200

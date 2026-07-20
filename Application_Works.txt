@@ -224,12 +224,13 @@ ADMIN DELETES SOP:
 │ 4. Frontend removes SOP from list                        │
 └──────────────────────────────────────────────────────────┘
 
-USER VIEWS AVAILABLE SOPS:
+USER AI ASK EXPERIENCE (REGULAR USER):
 ┌──────────────────────────────────────────────────────────┐
-│ 1. Frontend: GET /sops/                                  │
-│ 2. Backend returns: List of ALL SOPs with titles        │
-│ 3. Frontend displays in Dashboard dropdown/list          │
-│ 4. User selects an SOP to ask a question                │
+│ 1. User opens Dashboard                                  │
+│ 2. Frontend shows one Ask AI page (no SOP list)         │
+│ 3. User types a question directly                        │
+│ 4. Frontend submits POST /questions/ with question       │
+│ 5. Backend auto-selects the most relevant SOP context    │
 └──────────────────────────────────────────────────────────┘
 
 ================================================================================
@@ -238,11 +239,11 @@ USER VIEWS AVAILABLE SOPS:
 
 USER ASKS QUESTION:
 ┌─────────────────────────────────────────────────────────────────┐
-│ 1. User selects an SOP from dropdown (AskAI component)         │
-│ 2. User types a question in the text input                      │
-│ 3. User clicks "Ask" button                                     │
-│ 4. Frontend submits: POST /questions/                          │
-│    Payload: { sop_id: <id>, question: "user's question" }     │
+│ 1. User types a question in the AskAI component                │
+│ 2. User clicks "Ask" button                                    │
+│ 3. Frontend submits: POST /questions/                          │
+│    Payload: { question: "user's question" }                    │
+│    (Optional: sop_id can be passed when admin asks per SOP)    │
 └─────────────────────────────────────────────────────────────────┘
 
 RAG ENGINE PROCESSING (Backend - rag.py):
@@ -401,17 +402,16 @@ LOGIN.JS (Authentication Component):
 
 DASHBOARD.JS (Main Application Interface):
 ├─ State Variables:
-│  ├─ sops: List of all available SOPs
+│  ├─ sops: List of SOPs (loaded for admin view)
 │  ├─ user: Current user info (email, role)
 │  ├─ answers: User's Q&A history
-│  ├─ documents: Uploaded documents (if feature exists)
 │  └─ selectedSop: Currently selected SOP
 │
 ├─ On Mount:
 │  ├─ GET /auth/me → fetch current user
-│  ├─ GET /sops/ → fetch all SOPs
+│  ├─ If admin: GET /sops/ → fetch all SOPs
 │  ├─ GET /answers/ → fetch Q&A history
-│  └─ GET /documents/ → fetch documents
+│  └─ Render UI based on role
 │
 ├─ Admin-Only Sections:
 │  ├─ SOPForm component (create new SOP)
@@ -419,12 +419,12 @@ DASHBOARD.JS (Main Application Interface):
 │  └─ Delete buttons for SOPs
 │
 ├─ User Sections (All Authenticated Users):
-│  ├─ AskAI component (ask questions)
+│  ├─ AskAI single-page experience (no SOP list)
 │  ├─ Dashboard displays Q&A history
 │  └─ Clear history button
 │
 └─ Functions:
-   ├─ refreshSOPs(), refreshAnswers(), refreshDocuments()
+  ├─ refreshSOPs(), refreshAnswers()
    ├─ handleDeleteSOP(sopId)
    ├─ handleClearHistory()
    └─ onLogout callback
@@ -445,10 +445,10 @@ SOPDITOR.JS (Edit Existing SOP):
 ASKAI.JS (Question Interface):
 ├─ Purpose: User asks questions about SOPs
 ├─ Inputs:
-│  ├─ SOP Selector dropdown
 │  └─ Question text input
 ├─ Flow:
-│  ├─ POST /questions/ with sop_id and question
+│  ├─ POST /questions/ with question
+│  ├─ Backend finds best SOP context automatically
 │  ├─ Display generated answer and sources
 │  └─ Store in component state
 └─ Output: Display answer, sources, and metadata
@@ -504,8 +504,8 @@ SOP MANAGEMENT ROUTES (/sops prefix):
 │ GET /sops/                                                   │
 │ ├─ Protected (any authenticated user)                      │
 │ ├─ Returns all SOPs                                        │
-│ ├─ Admin users can see all SOPs they created               │
-│ ├─ Regular users can see all SOPs for questioning          │
+│ ├─ Primarily consumed by admin dashboard for management    │
+│ ├─ Regular user UI does not render SOP list                │
 │ ├─ Returns: [ {id, title, content, department, owner}, ...] │
 │ └─ HTTP: 200 (OK)                                          │
 │                                                             │
@@ -539,8 +539,9 @@ QUESTION ANSWERING ROUTES (/questions prefix):
 ┌─────────────────────────────────────────────────────────────┐
 │ POST /questions/                                             │
 │ ├─ Protected (any authenticated user)                      │
-│ ├─ Body: { sop_id, question }                             │
+│ ├─ Body: { question } or { sop_id, question }             │
 │ ├─ Calls RAG engine to generate answer                    │
+│ ├─ If sop_id is missing, backend retrieves across SOPs     │
 │ ├─ Stores Q&A in QnALog database                          │
 │ ├─ Returns: {answer, sources, sop_title, sop_owner}      │
 │ └─ HTTP: 200 (OK) or 400/404 (Error)                      │
@@ -587,25 +588,24 @@ TYPICAL USER JOURNEY - NEW USER:
 │ 7. Receives JWT token                                       │
 │ 8. Token saved to localStorage                             │
 │ 9. Redirected to Dashboard                                 │
-│ 10. Dashboard fetches available SOPs                       │
-│ 11. User can now ask questions                             │
+│ 10. Dashboard loads single Ask AI page                     │
+│ 11. User can now ask questions directly                    │
 └─────────────────────────────────────────────────────────────┘
 
 TYPICAL USER JOURNEY - ASKING A QUESTION:
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. User logged in, viewing Dashboard                       │
-│ 2. AskAI component displays SOP dropdown                    │
-│ 3. User selects an SOP                                     │
-│ 4. User types question (e.g., "How to handle an incident?")│
-│ 5. User clicks "Ask" button                                │
-│    └─ Frontend POST /questions/ with {sop_id, question}   │
-│    └─ Backend calls run_rag(question, sop.content)        │
-│    └─ RAG engine scores sentences and returns best match  │
+│ 2. AskAI page shows one question input                      │
+│ 3. User types question (e.g., "How to handle an incident?")│
+│ 4. User clicks "Ask" button                                │
+│    └─ Frontend POST /questions/ with {question}           │
+│    └─ Backend retrieves relevant SOP context automatically │
+│    └─ RAG engine returns best matched answer + sources    │
 │    └─ Backend creates QnALog record                       │
-│ 6. Frontend receives answer response                       │
-│ 7. Answer displayed with source excerpt                    │
-│ 8. Record stored in user's Q&A history                     │
-│ 9. User can view similar questions later in history       │
+│ 5. Frontend receives answer response                       │
+│ 6. Answer displayed with source excerpt                    │
+│ 7. Record stored in user's Q&A history                     │
+│ 8. User can view similar questions later in history       │
 └─────────────────────────────────────────────────────────────┘
 
 TYPICAL ADMIN WORKFLOW:
@@ -781,7 +781,7 @@ src/components/Login.js
 src/components/Dashboard.js
   └─ Main application interface
   ├─ SOP management section (admin)
-  ├─ Question asking section (all users)
+  ├─ Single Ask AI page for regular users
   ├─ Q&A history display
   └─ Component composition
 
@@ -797,9 +797,9 @@ src/components/SOPEditor.js
 
 src/components/AskAI.js
   └─ Question interface for users
-  ├─ SOP selector dropdown
+  ├─ Single question input page
   ├─ Question input
-  └─ Answer display with sources
+  └─ Answer display with sources (auto-selected SOP context)
 
 package.json
   ├─ Project metadata

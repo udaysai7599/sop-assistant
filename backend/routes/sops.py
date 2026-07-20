@@ -1,9 +1,38 @@
-from flask import Blueprint, request, jsonify
+import os
+import time
+from pathlib import Path
+from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import SOP, Department, User
+from werkzeug.utils import secure_filename
+from models import SOP, Department, User, SOPDocument
 from db import db
 
 sops_bp = Blueprint('sops', __name__)
+
+ALLOWED_DOCUMENT_EXTENSIONS = {'.txt', '.md', '.csv', '.pdf', '.doc', '.docx'}
+
+
+def _ensure_upload_dir():
+    base_dir = Path(__file__).resolve().parents[1]
+    upload_dir = base_dir / 'uploads' / 'documents'
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    return upload_dir
+
+
+def _extract_text_for_rag(file_bytes, suffix):
+    if suffix in {'.txt', '.md', '.csv'}:
+        return file_bytes.decode('utf-8', errors='ignore')
+    return ''
+
+
+def _document_payload(document):
+    return {
+        'id': document.id,
+        'title': document.title,
+        'original_filename': document.original_filename,
+        'download_url': f"/sops/documents/{document.id}/download",
+        'created_at': document.created_at.isoformat() if document.created_at else None
+    }
 
 
 def get_or_create_department(department_id=None, department_name=None):
@@ -92,7 +121,8 @@ def list_all_sops():
             "department_name": department.name if department else 'General',
             "owner_email": owner.email if owner else 'Unknown',
             "owner_id": sop.owner_id,
-            "is_owner": sop.owner_id == user_id
+            "is_owner": sop.owner_id == user_id,
+            "documents": [_document_payload(doc) for doc in sop.documents]
         })
     
     return jsonify(payload), 200
@@ -144,7 +174,8 @@ def get_sop(sop_id):
         "title": sop.title,
         "content": sop.content,
         "department_name": department.name if department else 'General',
-        "owner_email": owner.email if owner else 'Unknown'
+        "owner_email": owner.email if owner else 'Unknown',
+        "documents": [_document_payload(doc) for doc in sop.documents]
     }), 200
 
 
@@ -211,3 +242,83 @@ def delete_sop(sop_id):
     db.session.commit()
     
     return jsonify({"msg": "SOP deleted"}), 200
+
+
+@sops_bp.route('/<int:sop_id>/documents', methods=['POST'])
+@jwt_required()
+def upload_document(sop_id):
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    sop = SOP.query.get(sop_id)
+
+    if not sop:
+        return jsonify({"msg": "SOP not found"}), 404
+
+    if not user or not user.is_admin() or sop.owner_id != user_id:
+        return jsonify({"msg": "Only the admin who created this SOP can upload documents"}), 403
+
+    if 'document_file' not in request.files:
+        return jsonify({"msg": "document_file is required"}), 400
+
+    uploaded = request.files['document_file']
+    if not uploaded or not uploaded.filename:
+        return jsonify({"msg": "A valid file is required"}), 400
+
+    original_filename = uploaded.filename
+    safe_name = secure_filename(original_filename)
+    suffix = Path(safe_name).suffix.lower()
+    if suffix not in ALLOWED_DOCUMENT_EXTENSIONS:
+        return jsonify({"msg": "Unsupported document format"}), 400
+
+    file_bytes = uploaded.read()
+    if not file_bytes:
+        return jsonify({"msg": "Uploaded file is empty"}), 400
+
+    upload_dir = _ensure_upload_dir()
+    unique_name = f"sop{sop_id}_user{user_id}_{int(time.time())}_{safe_name}"
+    destination = upload_dir / unique_name
+    with open(destination, 'wb') as f:
+        f.write(file_bytes)
+
+    extracted_text = _extract_text_for_rag(file_bytes, suffix)
+    title = (request.form.get('document_title') or Path(original_filename).stem).strip() or Path(original_filename).stem
+
+    document = SOPDocument(
+        title=title,
+        original_filename=original_filename,
+        file_path=str(destination),
+        extracted_text=extracted_text,
+        uploaded_by=user_id,
+        sop_id=sop_id
+    )
+    db.session.add(document)
+    db.session.commit()
+
+    return jsonify({
+        'msg': 'Document uploaded',
+        'document': _document_payload(document)
+    }), 201
+
+
+@sops_bp.route('/<int:sop_id>/documents', methods=['GET'])
+@jwt_required()
+def list_sop_documents(sop_id):
+    sop = SOP.query.get(sop_id)
+    if not sop:
+        return jsonify({"msg": "SOP not found"}), 404
+
+    return jsonify([_document_payload(doc) for doc in sop.documents]), 200
+
+
+@sops_bp.route('/documents/<int:document_id>/download', methods=['GET'])
+@jwt_required()
+def download_document(document_id):
+    document = SOPDocument.query.get(document_id)
+    if not document:
+        return jsonify({"msg": "Document not found"}), 404
+
+    path = document.file_path
+    if not path or not os.path.exists(path):
+        return jsonify({"msg": "Document file missing on server"}), 404
+
+    return send_file(path, as_attachment=True, download_name=document.original_filename)

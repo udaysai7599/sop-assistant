@@ -12,20 +12,42 @@ function Login({ setToken }) {
   const submit = async () => {
     try {
       setMessage('');
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!normalizedEmail || !password) {
+        setMessage('✗ Email and password are required');
+        setMessageType('error');
+        return;
+      }
+
+      if (isSignup && password.length < 8) {
+        setMessage('✗ Password must be at least 8 characters');
+        setMessageType('error');
+        return;
+      }
+
       if (isSignup) {
-        const signupPayload = { email, password };
+        const signupPayload = { email: normalizedEmail, password };
         if (adminSecret) {
           signupPayload.admin_secret = adminSecret;
         }
         await axios.post('/auth/signup', signupPayload);
+
+        setIsSignup(false);
+        setPassword('');
+        setAdminSecret('');
+        setMessage('✓ Account created successfully. Please login with your credentials.');
+        setMessageType('success');
+        return;
       }
-      const loginRes = await axios.post('/auth/login', { email, password });
+
+      const loginRes = await axios.post('/auth/login', { email: normalizedEmail, password });
       setToken(loginRes.data.access_token);
       const roleText = loginRes.data.role === 'admin' ? 'Admin' : 'User';
       setMessage(`✓ Signed in successfully as ${roleText}`);
       setMessageType('success');
     } catch (error) {
-      const errorMsg = error.response?.data?.msg || 'Authentication failed';
+      const errorMsg = error.response?.data?.msg ||
+        'Cannot reach backend server at http://localhost:5000. Please start backend first.';
       setMessage(`✗ ${errorMsg}`);
       setMessageType('error');
     }
