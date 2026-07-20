@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../api';
 
-function AskAI({ token, sopId, onAnswered }) {
+function AskAI({ token, sopId, departmentFilter = '', departmentOptions = [], onDepartmentChange, onAnswered }) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [sources, setSources] = useState([]);
@@ -28,6 +28,7 @@ function AskAI({ token, sopId, onAnswered }) {
     try {
       const payload = { question };
       if (sopId) payload.sop_id = sopId;
+      if (!sopId && departmentFilter) payload.department_name = departmentFilter;
 
       const res = await axios.post('/questions/', payload);
       setAnswer(res.data.answer);
@@ -78,6 +79,20 @@ function AskAI({ token, sopId, onAnswered }) {
             {sopId ? 'Focused on this SOP and its uploaded documents.' : 'The assistant will search across all available SOPs and uploaded text documents.'}
           </p>
         </div>
+        {!sopId && departmentOptions.length > 0 && (
+          <div className="filter-shell">
+            <label>Department</label>
+            <select
+              value={departmentFilter}
+              onChange={e => onDepartmentChange && onDepartmentChange(e.target.value)}
+            >
+              <option value="">All departments</option>
+              {departmentOptions.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       <div className="ask-input-group ask-input-stack">
         <textarea

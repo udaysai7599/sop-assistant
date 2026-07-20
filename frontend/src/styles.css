@@ -200,6 +200,37 @@ body {
   color: #b8c7da;
 }
 
+.filter-shell {
+  min-width: 220px;
+}
+
+.filter-shell label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #b8c7da;
+}
+
+.filter-shell select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  font-size: 14px;
+  background: rgba(8, 15, 28, 0.92);
+  color: #e5eef8;
+}
+
+.filter-shell select:focus {
+  outline: none;
+  border-color: rgba(29, 155, 240, 0.7);
+  box-shadow: 0 0 0 4px rgba(29, 155, 240, 0.14);
+}
+
 .action-row {
   display: grid;
   gap: 10px;

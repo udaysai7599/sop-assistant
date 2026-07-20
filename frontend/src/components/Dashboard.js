@@ -9,6 +9,8 @@ function Dashboard({ token, onLogout }) {
   const [answers, setAnswers] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [adminDepartmentFilter, setAdminDepartmentFilter] = useState('');
   const [selectedSop, setSelectedSop] = useState(null);
   const [uploadFiles, setUploadFiles] = useState({});
   const [uploadTitles, setUploadTitles] = useState({});
@@ -48,9 +50,7 @@ function Dashboard({ token, onLogout }) {
 
   useEffect(() => {
     if (user) {
-      if (user.is_admin) {
-        refreshSOPs();
-      }
+      refreshSOPs();
       refreshAnswers();
     }
   }, [user, token]);
@@ -136,6 +136,10 @@ function Dashboard({ token, onLogout }) {
   const ownedSopCount = sops.filter(s => s.is_owner).length;
   const documentCount = sops.reduce((sum, sop) => sum + (Array.isArray(sop.documents) ? sop.documents.length : 0), 0);
   const answerCount = answers.length;
+  const departmentOptions = Array.from(new Set(sops.map(s => s.department_name).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  const visibleSops = adminDepartmentFilter
+    ? sops.filter(s => s.department_name === adminDepartmentFilter)
+    : sops;
 
   return (
     <div className="dashboard">
@@ -176,14 +180,29 @@ function Dashboard({ token, onLogout }) {
 
       {user.is_admin ? (
         <div className="section-card">
-          <h3>All SOPs</h3>
+          <div className="panel-heading">
+            <div>
+              <h3>All SOPs</h3>
+            </div>
+            {departmentOptions.length > 0 && (
+              <div className="filter-shell">
+                <label>Department</label>
+                <select value={adminDepartmentFilter} onChange={e => setAdminDepartmentFilter(e.target.value)}>
+                  <option value="">All departments</option>
+                  {departmentOptions.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
           <p className="muted" style={{ marginTop: 0 }}>
             Document upload is available inside each SOP card after the SOP is created. Only the admin who created the SOP can upload documents for it.
           </p>
-          {sops.length === 0 ? (
+          {visibleSops.length === 0 ? (
             <p className="muted">No SOPs created yet. Create one above, then use its Upload document panel.</p>
           ) : (
-            sops.map(s => (
+            visibleSops.map(s => (
               <div key={s.id} className="sop-card" style={{ flexDirection: 'column', gap: '12px' }}>
                 <div className="sop-info">
                   <div style={{ flex: 1 }}>
@@ -268,7 +287,13 @@ function Dashboard({ token, onLogout }) {
         <div className="section-card">
           <h3>Ask AI</h3>
           <p className="muted">Ask your question directly. The assistant will fetch the most relevant SOP guidance automatically.</p>
-          <AskAI token={token} onAnswered={refreshAnswers} />
+          <AskAI
+            token={token}
+            departmentFilter={departmentFilter}
+            departmentOptions={departmentOptions}
+            onDepartmentChange={setDepartmentFilter}
+            onAnswered={refreshAnswers}
+          />
         </div>
       )}
 

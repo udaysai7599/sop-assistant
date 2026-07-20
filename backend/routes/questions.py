@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import SOP, QnALog, User
+from models import SOP, QnALog, User, Department
 from db import db
 from rag import run_rag
 import json
@@ -18,6 +18,7 @@ def ask_question():
     data = request.json or {}
     sop_id = data.get('sop_id')
     question = (data.get('question') or '').strip()
+    department_name = (data.get('department_name') or '').strip()
 
     if not question:
         return jsonify({"msg": "Question is required"}), 400
@@ -28,9 +29,22 @@ def ask_question():
         selected_sop = SOP.query.get(int(sop_id))
         if not selected_sop:
             return jsonify({"msg": "SOP not found"}), 404
+        if department_name:
+            selected_department = Department.query.get(selected_sop.department_id) if selected_sop.department_id else None
+            if not selected_department or selected_department.name.lower() != department_name.lower():
+                return jsonify({"msg": "Selected SOP does not belong to that department"}), 400
         sop_candidates = [selected_sop]
     else:
-        sop_candidates = SOP.query.all()
+        if department_name:
+            sop_candidates = (
+                SOP.query.join(Department, SOP.department_id == Department.id)
+                .filter(db.func.lower(Department.name) == department_name.lower())
+                .all()
+            )
+            if not sop_candidates:
+                return jsonify({"msg": "No SOPs found for that department"}), 404
+        else:
+            sop_candidates = SOP.query.all()
         if not sop_candidates:
             return jsonify({"msg": "No SOPs available yet"}), 404
 
