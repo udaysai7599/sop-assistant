@@ -48,6 +48,7 @@ function AskAI({ token, sopId, onAnswered }) {
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+      e.preventDefault();
       ask();
     }
   };
@@ -70,20 +71,33 @@ function AskAI({ token, sopId, onAnswered }) {
 
   return (
     <div className="ask-ai">
-      <div className="ask-input-group">
-        <input
+      <div className="ask-toolbar">
+        <div>
+          <span className="status-pill">AI retrieval</span>
+          <p className="muted ask-description">
+            {sopId ? 'Focused on this SOP and its uploaded documents.' : 'The assistant will search across all available SOPs and uploaded text documents.'}
+          </p>
+        </div>
+      </div>
+      <div className="ask-input-group ask-input-stack">
+        <textarea
+          rows={3}
           placeholder={sopId ? 'Ask about this SOP or uploaded document' : 'Ask a question and AI will find the best SOP guidance'}
           value={question} 
           onChange={e => setQuestion(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           disabled={isLoading}
         />
-        <button 
-          onClick={ask}
-          disabled={isLoading}
-        >
-          {isLoading ? 'Thinking...' : 'Ask'}
-        </button>
+        <div className="ask-actions-row">
+          <span className="muted">Press Enter to submit, Shift+Enter for a new line.</span>
+          <button 
+            onClick={ask}
+            disabled={isLoading}
+            className="compact-btn"
+          >
+            {isLoading ? 'Thinking...' : 'Ask AI'}
+          </button>
+        </div>
       </div>
       {answer && (
         <div className="answer-box">

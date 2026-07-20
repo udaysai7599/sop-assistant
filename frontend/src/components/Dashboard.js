@@ -133,27 +133,47 @@ function Dashboard({ token, onLogout }) {
     return <div className="dashboard"><p>Error loading user information. Please login again.</p></div>;
   }
 
+  const ownedSopCount = sops.filter(s => s.is_owner).length;
+  const documentCount = sops.reduce((sum, sop) => sum + (Array.isArray(sop.documents) ? sop.documents.length : 0), 0);
+  const answerCount = answers.length;
+
   return (
     <div className="dashboard">
-      <div className="dashboard-header">
-        <div>
-          <h2>SOP Assistant Dashboard</h2>
-          <p className="muted">
-            {user.is_admin 
-              ? 'You are an Admin. Create and manage SOPs. Users can ask questions about them.'
-              : 'Ask questions against available SOPs and keep the answers for later.'}
-          </p>
-          <p className="muted">Logged in as: <strong>{user.email}</strong> ({user.role})</p>
+      <div className="workspace-hero section-card">
+        <div className="dashboard-header">
+          <div>
+            <span className="eyebrow">Operations Workspace</span>
+            <h2>SOP Assistant Dashboard</h2>
+            <p className="muted">
+              {user.is_admin
+                ? 'Manage procedures, attach supporting files, and validate answers against live SOP content.'
+                : 'Ask operational questions and receive source-backed guidance from the latest SOP knowledge base.'}
+            </p>
+            <p className="muted">Logged in as: <strong>{user.email}</strong> ({user.role})</p>
+          </div>
+          <button className="secondary compact-btn" onClick={onLogout}>Logout</button>
         </div>
-        <button className="secondary" onClick={onLogout}>Logout</button>
+
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-label">Owned SOPs</span>
+            <strong>{user.is_admin ? ownedSopCount : 'Access via AI'}</strong>
+          </div>
+          <div className="stat-card">
+            <span className="stat-label">Documents</span>
+            <strong>{user.is_admin ? documentCount : 'Available in answers'}</strong>
+          </div>
+          <div className="stat-card">
+            <span className="stat-label">Saved answers</span>
+            <strong>{answerCount}</strong>
+          </div>
+        </div>
       </div>
 
-      {/* Admin-only: SOP Creation Form */}
       {user.is_admin && (
         <SOPForm onCreated={() => { refreshSOPs(); refreshAnswers(); }} />
       )}
 
-      {/* Questioning experience */}
       {user.is_admin ? (
         <div className="section-card">
           <h3>All SOPs</h3>
@@ -252,12 +272,11 @@ function Dashboard({ token, onLogout }) {
         </div>
       )}
 
-      {/* Answers/Q&A History Section */}
       <div className="section-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3>Your Q&A History</h3>
           {answers.length > 0 && (
-            <button className="danger" onClick={handleClearHistory} style={{ padding: '8px 15px' }}>
+            <button className="danger compact-btn" onClick={handleClearHistory}>
               Clear History
             </button>
           )}

@@ -52,6 +52,10 @@ function SOPEditor({ sop, onClose, onUpdated }) {
         <div className="modal-body">
           {isEditing ? (
             <>
+              <div className="editor-banner">
+                <span className="status-pill">Edit mode</span>
+                <p className="muted intro-copy">Update the latest approved procedure text, then save changes to refresh the SOP used by the assistant.</p>
+              </div>
               <div className="form-group">
                 <label>SOP Title</label>
                 <input
@@ -82,12 +86,12 @@ function SOPEditor({ sop, onClose, onUpdated }) {
                   onChange={handleChange}
                   placeholder="Enter SOP content"
                   rows="12"
-                  style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                  className="editor-textarea"
                 />
               </div>
 
               {message && (
-                <p className="message" style={{
+                <p className="message banner-message" style={{
                   color: message.startsWith('✓') ? '#388e3c' : '#d32f2f'
                 }}>
                   {message}
@@ -98,7 +102,7 @@ function SOPEditor({ sop, onClose, onUpdated }) {
                 <button 
                   onClick={handleSave}
                   disabled={isSaving}
-                  style={{ backgroundColor: '#388e3c' }}
+                  className="compact-btn"
                 >
                   {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -120,6 +124,10 @@ function SOPEditor({ sop, onClose, onUpdated }) {
             </>
           ) : (
             <>
+              <div className="editor-banner">
+                <span className="status-pill">Read only</span>
+                <p className="muted intro-copy">Review the stored procedure details below, or switch to edit mode to revise the SOP.</p>
+              </div>
               <div className="sop-details">
                 <div className="detail-row">
                   <strong>Title:</strong>
@@ -133,15 +141,7 @@ function SOPEditor({ sop, onClose, onUpdated }) {
 
                 <div className="detail-row">
                   <strong>Content:</strong>
-                  <pre style={{
-                    backgroundColor: '#f5f5f5',
-                    padding: '15px',
-                    borderRadius: '4px',
-                    overflow: 'auto',
-                    maxHeight: '400px',
-                    fontSize: '12px',
-                    lineHeight: '1.5'
-                  }}>
+                  <pre className="detail-pre">
                     {sop.content}
                   </pre>
                 </div>
@@ -150,7 +150,7 @@ function SOPEditor({ sop, onClose, onUpdated }) {
               <div className="modal-actions">
                 <button 
                   onClick={() => setIsEditing(true)}
-                  style={{ backgroundColor: '#1976d2' }}
+                  className="compact-btn"
                 >
                   Edit SOP
                 </button>

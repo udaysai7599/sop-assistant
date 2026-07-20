@@ -32,38 +32,62 @@ function SOPForm({ onCreated }) {
   };
 
   return (
-    <div className="section-card">
-      <h3>📝 Create New SOP (Admin Only)</h3>
-      <p className="muted" style={{ marginTop: 0 }}>
-        Step 1: Create and save SOP text here. Step 2: Use the Upload document panel shown in that SOP card below.
+    <div className="section-card creation-panel">
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">Admin authoring</span>
+          <h3>Create New SOP</h3>
+        </div>
+        <span className="status-pill">Admin only</span>
+      </div>
+      <p className="muted intro-copy">
+        Draft the procedure here first. After saving, the SOP appears in the management list below where you can upload supporting documents for the same workflow.
       </p>
-      <input 
-        placeholder="SOP title" 
-        value={title} 
-        onChange={e => setTitle(e.target.value)}
-        disabled={isLoading}
-      />
-      <input 
-        placeholder="Department (e.g., IT, HR, Finance)" 
-        value={departmentName} 
-        onChange={e => setDepartmentName(e.target.value)}
-        disabled={isLoading}
-      />
-      <textarea 
-        placeholder="Paste SOP content or guidance here" 
-        value={content} 
-        onChange={e => setContent(e.target.value)}
-        disabled={isLoading}
-        rows={6}
-      />
-      <button 
-        onClick={createSOP}
-        disabled={isLoading}
-      >
-        {isLoading ? 'Creating...' : 'Save SOP'}
-      </button>
+
+      <div className="form-grid two-column-grid">
+        <div className="field-shell">
+          <label>SOP Title</label>
+          <input
+            placeholder="Example: Employee Onboarding Procedure"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+        <div className="field-shell">
+          <label>Department</label>
+          <input
+            placeholder="Example: HR, IT, Finance"
+            value={departmentName}
+            onChange={e => setDepartmentName(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+      </div>
+
+      <div className="field-shell">
+        <label>Procedure Content</label>
+        <textarea
+          placeholder="Paste the operational steps, exceptions, approvals, and escalation guidance here."
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          disabled={isLoading}
+          rows={8}
+        />
+      </div>
+
+      <div className="panel-footer">
+        <div className="muted helper-copy">Supported document upload becomes available immediately after this SOP is saved.</div>
+        <button
+          onClick={createSOP}
+          disabled={isLoading}
+          className="compact-btn"
+        >
+          {isLoading ? 'Creating...' : 'Save SOP'}
+        </button>
+      </div>
       {message && (
-        <p className="message" style={{
+        <p className="message banner-message" style={{
           color: message.startsWith('✓') ? '#388e3c' : '#d32f2f'
         }}>
           {message}

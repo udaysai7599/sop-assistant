@@ -54,48 +54,79 @@ function Login({ setToken }) {
   };
 
   return (
-    <div className="auth-card">
-      <h2>{isSignup ? 'Create account' : 'Welcome back'}</h2>
-      <p className="muted">
-        {isSignup 
-          ? 'Create a new account to get started. (Admins: enter admin secret for admin privileges)'
-          : 'Access SOP guidance, ask questions, and save answers.'}
-      </p>
-      <input 
-        placeholder="Email" 
-        value={email} 
-        onChange={e => setEmail(e.target.value)}
-        type="email"
-      />
-      <input 
-        type="password" 
-        placeholder="Password" 
-        value={password} 
-        onChange={e => setPassword(e.target.value)} 
-      />
-      {isSignup && (
-        <input 
-          type="password" 
-          placeholder="Admin Secret (optional, leave blank for regular user)" 
-          value={adminSecret} 
-          onChange={e => setAdminSecret(e.target.value)}
-        />
-      )}
-      <button onClick={submit}>{isSignup ? 'Sign up' : 'Login'}</button>
-      <button className="secondary" onClick={() => {
-        setIsSignup(!isSignup);
-        setMessage('');
-        setAdminSecret('');
-      }}>
-        {isSignup ? 'Switch to login' : 'Switch to sign up'}
-      </button>
-      {message && (
-        <p className={`message ${messageType}`} style={{
-          color: messageType === 'error' ? '#d32f2f' : messageType === 'success' ? '#388e3c' : '#1976d2'
-        }}>
-          {message}
+    <div className="auth-layout">
+      <div className="auth-hero-panel">
+        <span className="eyebrow">Internal Knowledge Hub</span>
+        <h1>SOP Assistant</h1>
+        <p>
+          Centralize operating procedures, attach supporting documents, and let teams retrieve the right answer in seconds.
         </p>
-      )}
+        <div className="hero-points">
+          <div className="hero-point">
+            <strong>Admin control</strong>
+            <span>Create SOPs, attach documents, and keep guidance current.</span>
+          </div>
+          <div className="hero-point">
+            <strong>Fast retrieval</strong>
+            <span>Users ask plain-language questions and get sourced answers.</span>
+          </div>
+          <div className="hero-point">
+            <strong>Audit trail</strong>
+            <span>Saved Q&A history makes recurring operational questions visible.</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="auth-card auth-panel">
+        <div className="auth-panel-header">
+          <span className="status-pill">Secure workspace</span>
+          <h2>{isSignup ? 'Create account' : 'Welcome back'}</h2>
+          <p className="muted">
+            {isSignup
+              ? 'Create a new account to get started. Admins can enter the admin secret during sign up.'
+              : 'Sign in to manage SOPs, upload supporting files, or ask AI for guidance.'}
+          </p>
+        </div>
+        <div className="form-grid">
+          <input
+            placeholder="Work email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            type="email"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+          />
+          {isSignup && (
+            <input
+              type="password"
+              placeholder="Admin Secret (optional)"
+              value={adminSecret}
+              onChange={e => setAdminSecret(e.target.value)}
+            />
+          )}
+        </div>
+        <div className="action-row">
+          <button onClick={submit}>{isSignup ? 'Create account' : 'Login'}</button>
+          <button className="secondary" onClick={() => {
+            setIsSignup(!isSignup);
+            setMessage('');
+            setAdminSecret('');
+          }}>
+            {isSignup ? 'Switch to login' : 'Switch to sign up'}
+          </button>
+        </div>
+        {message && (
+          <p className={`message banner-message ${messageType}`} style={{
+            color: messageType === 'error' ? '#fecaca' : messageType === 'success' ? '#bbf7d0' : '#bfdbfe'
+          }}>
+            {message}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

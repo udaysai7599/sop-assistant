@@ -64,7 +64,9 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${token ? 'dashboard-shell' : 'auth-shell'}`}>
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
       {!token ? <Login setToken={setToken} /> : <Dashboard token={token} onLogout={() => setToken(null)} />}
     </div>
   );
